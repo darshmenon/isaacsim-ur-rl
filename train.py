@@ -16,6 +16,8 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--headless", action="store_true", help="Run without GUI")
 parser.add_argument("--timesteps", type=int, default=1_000_000)
 parser.add_argument("--config", default="configs/sac_reach.yaml")
+parser.add_argument("--resume", nargs="?", const="models/ur10_reach_final.zip", default=None,
+                     help="Resume training from a saved model (default: models/ur10_reach_final.zip)")
 args, unknown = parser.parse_known_args()
 
 # --- Launch Isaac Sim (must happen before all other imports) ---------------
@@ -74,24 +76,29 @@ callbacks = [
     ),
 ]
 
-model = SAC(
-    cfg.get("policy", "MlpPolicy"),
-    env,
-    verbose=1,
-    tensorboard_log=LOG_DIR,
-    learning_rate=cfg.get("learning_rate", 3e-4),
-    buffer_size=cfg.get("buffer_size", 300_000),
-    batch_size=cfg.get("batch_size", 256),
-    gamma=cfg.get("gamma", 0.99),
-    tau=cfg.get("tau", 0.005),
-    ent_coef=cfg.get("ent_coef", "auto"),
-    train_freq=cfg.get("train_freq", 1),
-    gradient_steps=cfg.get("gradient_steps", 1),
-    learning_starts=cfg.get("learning_starts", 5_000),
-)
+if args.resume:
+    print(f"Resuming from {args.resume}...")
+    model = SAC.load(args.resume, env=env, tensorboard_log=LOG_DIR)
+else:
+    model = SAC(
+        cfg.get("policy", "MlpPolicy"),
+        env,
+        verbose=1,
+        tensorboard_log=LOG_DIR,
+        learning_rate=cfg.get("learning_rate", 3e-4),
+        buffer_size=cfg.get("buffer_size", 300_000),
+        batch_size=cfg.get("batch_size", 256),
+        gamma=cfg.get("gamma", 0.99),
+        tau=cfg.get("tau", 0.005),
+        ent_coef=cfg.get("ent_coef", "auto"),
+        train_freq=cfg.get("train_freq", 1),
+        gradient_steps=cfg.get("gradient_steps", 1),
+        learning_starts=cfg.get("learning_starts", 5_000),
+    )
 
 print(f"Starting SAC training — {args.timesteps:,} steps on UR10 reach task...")
-model.learn(total_timesteps=args.timesteps, callback=callbacks, progress_bar=True)
+model.learn(total_timesteps=args.timesteps, callback=callbacks, progress_bar=True,
+            reset_num_timesteps=not args.resume)
 model.save(f"{MODEL_DIR}/ur10_reach_final")
 print("Training complete. Model saved to models/ur10_reach_final.zip")
 
