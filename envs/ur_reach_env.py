@@ -43,8 +43,18 @@ class URReachEnv(gym.Env):
         # Deferred Isaac Sim imports (SimulationApp must already be running)
         from isaacsim.core.api import World
         from isaacsim.core.utils.prims import define_prim
-        from isaacsim.robot.manipulators.examples.universal_robots.ur10 import UR10
+        from isaacsim.robot.manipulators.examples.universal_robots.ur10 import UR10 as _UR10
         from isaacsim.storage.native import get_assets_root_path
+
+        class UR10(_UR10):
+            # Upstream UR10.post_reset() calls self._gripper.post_reset()
+            # unconditionally, which crashes when attach_gripper=False (the
+            # default) since _gripper is None. Guard it here.
+            def post_reset(self) -> None:
+                super(_UR10, self).post_reset()
+                self._end_effector.post_reset()
+                if self._gripper is not None:
+                    self._gripper.post_reset()
 
         self.render_mode = render_mode
         self._action_scale = action_scale
@@ -74,13 +84,14 @@ class URReachEnv(gym.Env):
                 prim_path="/World/UR10",
                 name="ur10",
                 position=np.array([0.0, 0.0, 0.0]),
+                attach_gripper=True,
             )
         )
 
-        # Target visual marker (sphere)
-        from isaacsim.core.api.objects import DynamicSphere
+        # Target visual marker (sphere, no physics)
+        from isaacsim.core.api.objects import VisualSphere
         self._target_obj = self._world.scene.add(
-            DynamicSphere(
+            VisualSphere(
                 prim_path="/World/Target",
                 name="target",
                 position=np.array([0.4, 0.0, 0.4]),
@@ -88,12 +99,6 @@ class URReachEnv(gym.Env):
                 color=np.array([1.0, 0.0, 0.0]),
             )
         )
-        # Make target kinematic (no physics, just visual)
-        from pxr import UsdPhysics
-        from isaacsim.core.utils.prims import get_prim_at_path
-        prim = get_prim_at_path("/World/Target")
-        if prim.HasAPI(UsdPhysics.RigidBodyAPI):
-            UsdPhysics.RigidBodyAPI(prim).GetRigidBodyEnabledAttr().Set(False)
 
         self._world.reset()
 
@@ -102,7 +107,7 @@ class URReachEnv(gym.Env):
         obs_dim = self._n_joints * 2 + 3  # qpos + qvel + target xyz
 
         joint_pos_hi = np.array([np.pi] * self._n_joints, dtype=np.float32)
-        joint_vel_hi = np.array([np.pi] * self._n_joints, dtype=np.float32)
+        joint_vel_hi = np.array([10.0] * self._n_joints, dtype=np.float32)
         obs_hi = np.concatenate([joint_pos_hi, joint_vel_hi, np.full(3, 2.0, dtype=np.float32)])
 
         self.observation_space = spaces.Box(
@@ -124,7 +129,10 @@ class URReachEnv(gym.Env):
     def _get_obs(self) -> np.ndarray:
         qpos = self._robot.get_joint_positions()[:self._n_joints].astype(np.float32)
         qvel = self._robot.get_joint_velocities()[:self._n_joints].astype(np.float32)
-        return np.concatenate([qpos, qvel, self._target_pos])
+        obs = np.concatenate([qpos, qvel, self._target_pos])
+        # Physics can produce transient outliers (contact events, drive
+        # saturation) that briefly exceed the declared space bounds.
+        return np.clip(obs, self.observation_space.low, self.observation_space.high)
 
     def _randomize_target(self) -> np.ndarray:
         r = self.np_random.uniform(0.25, 0.55)
