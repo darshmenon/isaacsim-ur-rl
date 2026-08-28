@@ -6,6 +6,8 @@
 
 Reinforcement learning for UR arm reach and pick-and-place tasks in **NVIDIA Isaac Sim**, using **SAC** (Stable Baselines 3) with a custom gym environment backed by the Isaac Sim physics engine.
 
+![UR10 reach task training in Isaac Sim](docs/isaac_sim_screenshot.png)
+
 ---
 
 ## What it does
