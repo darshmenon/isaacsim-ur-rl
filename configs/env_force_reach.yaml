@@ -1,0 +1,20 @@
+env:
+  robot: ur10
+  physics_dt: 0.002         # 500 Hz
+  rendering_dt: 0.02        # 50 Hz (every 10 physics steps)
+  max_episode_steps: 500    # 10 s at 50 Hz
+  target_radius: 0.05       # reach threshold (m)
+  reach_bonus: 10.0
+  action_scale: 0.3         # rad per step
+  impedance_gain: 0.0       # 0 = plain position control; >0 enables virtual compliance
+  force_clip: 200.0         # N, clip range for wrist force readings
+  enable_camera: true
+  camera_resolution: [224, 224]
+
+collection:
+  source_policy: models/ur10_reach_final.zip
+  task_instruction: "reach the target and make light contact"
+  fps: 50
+  n_episodes: 20
+  repo_id: isaacsim-ur-rl/reach-contact-v0
+  output_root: ./datasets/reach-contact-v0

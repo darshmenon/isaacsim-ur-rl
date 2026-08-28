@@ -1,0 +1,26 @@
+# Phase-2 STRETCH GOAL — SmolVLA fine-tuning config. Not wired to a training
+# script yet. Requires:
+#   - real per-episode language instructions (not a single static string)
+#   - a GPU with enough memory for the SmolVLM2 backbone (check current specs
+#     against lerobot's SmolVLA docs before attempting)
+#   - `policy.type: smolvla` in place of `act` below, everything else follows
+#     the same pattern as act_train.yaml
+#
+# TODO when starting phase 2:
+#   1. Confirm exact SmolVLA config fields via
+#      `src/lerobot/policies/smolvla/configuration_smolvla.py` in the lerobot
+#      checkout (max_state_dim/max_action_dim padding, tokenizer_max_length,
+#      vlm_model_name, chunk_size=50, flow-matching num_steps).
+#   2. Re-collect or re-label the dataset with varied task instructions.
+#   3. Write train_smolvla.py mirroring train_act.py.
+
+dataset:
+  repo_id: isaacsim-ur-rl/reach-contact-v0
+  root: ./datasets/reach-contact-v0
+
+policy:
+  type: smolvla
+
+training:
+  output_dir: ./outputs/smolvla_v0
+  device: cuda

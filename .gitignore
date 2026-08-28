@@ -10,3 +10,8 @@ logs/
 models/*.zip
 *.zip
 .DS_Store
+datasets/
+outputs/
+
+# local design doc, never pushed
+robocloud.md

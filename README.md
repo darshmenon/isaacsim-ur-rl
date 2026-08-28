@@ -103,6 +103,33 @@ env:
 
 ---
 
+## Force-Aware VLA Extension
+
+Adds contact-force sensing and a fine-tuning pipeline on top of the reach task, toward fine-tuning an existing VLA/manipulation policy (LeRobot's ACT, then SmolVLA) rather than designing a new architecture from scratch.
+
+- **`envs/ur_force_env.py`** — `URForceReachEnv`, a 21-dim-observation variant of `URReachEnv` adding wrist contact force (via `RigidContactView`, force-only in v1) and an optional virtual-impedance action mode (`impedance_gain` attenuates the position-delta step by measured contact force).
+- **`collect_data.py`** — rolls out episodes (using the trained SAC checkpoint from this repo as a cheap motion source) and records them into a `LeRobotDataset` (state + wrist RGB + action + task instruction).
+- **`train_act.py`** — thin wrapper around LeRobot's `lerobot-train` CLI to fine-tune ACT on the collected dataset. No LeRobot core changes needed — force channels ride along as extra `observation.state` dims.
+- **`run_policy_act.py`** — closed-loop evaluation of the fine-tuned ACT policy in Isaac Sim (mirrors `run_policy.py`'s structure).
+- **`configs/env_force_reach.yaml`, `configs/act_train.yaml`, `configs/smolvla_train.yaml`** — env/training configs; SmolVLA is a documented phase-2 stretch goal, not wired to a training script yet.
+
+Requires a local `lerobot` checkout: `pip install -e ../lerobot`.
+
+```bash
+# 1. Record a dataset
+python collect_data.py --headless --config configs/env_force_reach.yaml
+
+# 2. Fine-tune ACT
+python train_act.py --config configs/act_train.yaml
+
+# 3. Evaluate closed-loop
+python run_policy_act.py --checkpoint outputs/act_v0/checkpoints/last --headless
+```
+
+Status: scaffolded, not yet verified end-to-end in Isaac Sim.
+
+---
+
 ## Author
 
 **darshmenon** — [github.com/darshmenon](https://github.com/darshmenon)
