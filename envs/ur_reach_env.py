@@ -78,7 +78,7 @@ class URReachEnv(gym.Env):
         )
 
         # Target visual marker (sphere)
-        from isaacsim.core.objects import DynamicSphere
+        from isaacsim.core.api.objects import DynamicSphere
         self._target_obj = self._world.scene.add(
             DynamicSphere(
                 prim_path="/World/Target",
