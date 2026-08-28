@@ -6,8 +6,17 @@ env:
   target_radius: 0.05       # reach threshold (m)
   reach_bonus: 10.0
   action_scale: 0.3         # rad per step
-  impedance_gain: 0.0       # 0 = plain position control; >0 enables virtual compliance
+  control_mode: position    # "position" (drive-based, teleport-free) or "impedance" (true torque control)
+  impedance_gain: 0.0       # position mode only: 0 = plain; >0 attenuates step by measured force (virtual compliance)
   force_clip: 200.0         # N, clip range for wrist force readings
+
+  # impedance mode only -- tune these for your task:
+  #   higher impedance_kp -> stiffer tracking, less compliant on contact
+  #   higher impedance_kd -> more damping, less oscillation
+  #   start stiff (e.g. kp=400) to verify tracking, then lower kp for compliance
+  impedance_kp: 400.0       # N*m/rad, per-joint proportional gain
+  impedance_kd: 40.0        # N*m*s/rad, per-joint derivative gain
+  max_effort: 150.0         # N*m, safety clip on commanded torque
   enable_camera: true
   camera_resolution: [224, 224]
 

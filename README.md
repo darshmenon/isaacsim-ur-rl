@@ -107,7 +107,7 @@ env:
 
 Adds contact-force sensing and a fine-tuning pipeline on top of the reach task, toward fine-tuning an existing VLA/manipulation policy (LeRobot's ACT, then SmolVLA) rather than designing a new architecture from scratch.
 
-- **`envs/ur_force_env.py`** — `URForceReachEnv`, a 21-dim-observation variant of `URReachEnv` adding wrist contact force (via `RigidContactView`, force-only in v1) and an optional virtual-impedance action mode (`impedance_gain` attenuates the position-delta step by measured contact force).
+- **`envs/ur_force_env.py`** — `URForceReachEnv`, a 21-dim-observation variant of `URReachEnv` adding wrist contact force (via `RigidContactView`, force-only in v1) and two `control_mode`s: `"position"` (drive-based, with optional virtual-compliance `impedance_gain`) and `"impedance"` (true torque control: `switch_control_mode("effort")` + a manually computed `tau = Kp*(q_des-q) + Kd*(0-qdot)`, gains in `configs/env_force_reach.yaml`). Both modes command through `apply_action(...)` rather than `set_joint_positions()` (which teleports rather than physically drives — see `robocloud.md` for details), so contact/impedance behavior is physically grounded.
 - **`collect_data.py`** — rolls out episodes (using the trained SAC checkpoint from this repo as a cheap motion source) and records them into a `LeRobotDataset` (state + wrist RGB + action + task instruction).
 - **`train_act.py`** — thin wrapper around LeRobot's `lerobot-train` CLI to fine-tune ACT on the collected dataset. No LeRobot core changes needed — force channels ride along as extra `observation.state` dims.
 - **`run_policy_act.py`** — closed-loop evaluation of the fine-tuned ACT policy in Isaac Sim (mirrors `run_policy.py`'s structure).

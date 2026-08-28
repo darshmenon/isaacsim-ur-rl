@@ -1,10 +1,21 @@
 # UR10 Force-Contact Reach Task — Isaac Sim RL/data-collection environment
 # Gymnasium-compatible wrapper around Isaac Sim, extending the plain
 # position-control reach task (see ../../isaacsim-ur-rl/envs/ur_reach_env.py)
-# with wrist contact-force sensing and a virtual-impedance action mode.
+# with wrist contact-force sensing and a real joint-impedance action mode.
+#
+# NOTE on ur_reach_env.py: that env drives joints via set_joint_positions(),
+# which *teleports* the articulation to the target every step rather than
+# commanding the drive through PhysX (see SingleArticulation.set_joint_positions
+# docstring: "This method will immediately set (teleport) the affected
+# joints... Use apply_action to control robot joints."). That's fine for a
+# pure kinematic reach reward, but it means contact response and any
+# force/impedance behavior built on top of it would not be physically
+# meaningful. This env instead always drives the arm through
+# get_articulation_controller().apply_action(...), so joints are actually
+# integrated by PhysX and contact/impedance behavior is real.
 #
 # The Isaac Sim SimulationApp must be launched BEFORE importing this module.
-# See run_policy.py / collect_data.py for the correct launch pattern.
+# See run_policy_act.py / collect_data.py for the correct launch pattern.
 
 import numpy as np
 import gymnasium as gym
@@ -23,11 +34,21 @@ class URForceReachEnv(gym.Env):
                                   force); see docs on upgrading to a computed
                                   moment from get_contact_force_data().
 
-    Action (6-dim):
-        normalized joint position deltas in [-1, 1], scaled by
-        ``action_scale`` (rad). When ``impedance_gain`` > 0, the effective
-        scale is attenuated by measured contact force magnitude (virtual
-        compliance) instead of applying the raw delta unconditionally.
+    Action (6-dim): normalized joint position deltas in [-1, 1], scaled by
+    ``action_scale`` (rad). Two ``control_mode``s:
+
+    - ``"position"``: commands ``q_des = q + action*action_scale`` through the
+      drive's own PD (``apply_action(ArticulationAction(joint_positions=...))``).
+      When ``impedance_gain`` > 0, the effective scale is attenuated by
+      measured contact force magnitude ("virtual compliance": soften the
+      commanded step under load, but the underlying drive stiffness is
+      whatever the USD asset's default Kp/Kd are).
+    - ``"impedance"``: switches the articulation to PhysX "effort" mode (zeros
+      the drive's internal Kp/Kd) and applies a manually computed joint torque
+      ``tau = Kp*(q_des - q) + Kd*(0 - qdot)`` every step
+      (``impedance_kp``/``impedance_kd``, clipped to ``max_effort``). This is
+      genuine impedance control: compliance comes from choosing a soft Kp,
+      not from post-hoc scaling of a position command.
 
     Reward:
         -dist(ee, target) per step
@@ -49,15 +70,24 @@ class URForceReachEnv(gym.Env):
         force_clip: float = 200.0,
         enable_camera: bool = False,
         camera_resolution: tuple = (224, 224),
+        control_mode: str = "position",
+        impedance_kp: float = 400.0,
+        impedance_kd: float = 40.0,
+        max_effort: float = 150.0,
     ):
         super().__init__()
+        if control_mode not in ("position", "impedance"):
+            raise ValueError(f"control_mode must be 'position' or 'impedance', got {control_mode!r}")
 
         # Deferred Isaac Sim imports (SimulationApp must already be running)
         from isaacsim.core.api import World
         from isaacsim.core.utils.prims import define_prim
         from isaacsim.core.api.sensors import RigidContactView
+        from isaacsim.core.utils.types import ArticulationAction
         from isaacsim.robot.manipulators.examples.universal_robots.ur10 import UR10 as _UR10
         from isaacsim.storage.native import get_assets_root_path
+
+        self._ArticulationAction = ArticulationAction  # stashed for use in step()
 
         class UR10(_UR10):
             # Upstream UR10.post_reset() calls self._gripper.post_reset()
@@ -78,6 +108,10 @@ class URForceReachEnv(gym.Env):
         self._impedance_gain = impedance_gain
         self._force_clip = force_clip
         self._enable_camera = enable_camera
+        self._control_mode = control_mode
+        self._impedance_kp = impedance_kp
+        self._impedance_kd = impedance_kd
+        self._max_effort = max_effort
 
         # --- World & robot ------------------------------------------------
         self._world = World(
@@ -144,6 +178,15 @@ class URForceReachEnv(gym.Env):
 
         # --- Spaces -------------------------------------------------------
         self._n_joints = 6
+        self._joint_indices = np.arange(self._n_joints)
+
+        if self._control_mode == "impedance":
+            # Zeros the drive's internal PD (Kp=Kd=0) for the arm joints so
+            # our manually computed torque isn't fought by the position
+            # drive -- see get_articulation_controller().apply_action() below.
+            self._robot.get_articulation_controller().switch_control_mode(
+                "effort", joint_indices=self._joint_indices
+            )
         obs_dim = self._n_joints * 2 + 3 + 6  # qpos + qvel + target xyz + wrench
 
         joint_pos_hi = np.array([np.pi] * self._n_joints, dtype=np.float32)
@@ -228,18 +271,31 @@ class URForceReachEnv(gym.Env):
         return self._get_obs(), {}
 
     def step(self, action: np.ndarray):
-        # Apply joint position delta, optionally attenuated by measured
-        # contact force (virtual impedance / compliance). With
-        # impedance_gain == 0 this reduces exactly to plain position control
-        # (see ur_reach_env.py:170).
         current_pos = self._robot.get_joint_positions()[: self._n_joints]
-        if self._impedance_gain > 0.0:
-            force_mag = float(np.linalg.norm(self._last_wrench[:3]))
-            effective_scale = self._action_scale / (1.0 + self._impedance_gain * force_mag)
+
+        if self._control_mode == "impedance":
+            current_vel = self._robot.get_joint_velocities()[: self._n_joints]
+            q_des = current_pos + action * self._action_scale
+            tau = self._impedance_kp * (q_des - current_pos) + self._impedance_kd * (0.0 - current_vel)
+            tau = np.clip(tau, -self._max_effort, self._max_effort)
+            self._robot.get_articulation_controller().apply_action(
+                self._ArticulationAction(joint_efforts=tau, joint_indices=self._joint_indices)
+            )
         else:
-            effective_scale = self._action_scale
-        target_pos = current_pos + action * effective_scale
-        self._robot.set_joint_positions(target_pos)
+            # Optionally attenuate the commanded step by measured contact
+            # force (virtual compliance). With impedance_gain == 0 this is
+            # plain position control.
+            if self._impedance_gain > 0.0:
+                force_mag = float(np.linalg.norm(self._last_wrench[:3]))
+                effective_scale = self._action_scale / (1.0 + self._impedance_gain * force_mag)
+            else:
+                effective_scale = self._action_scale
+            target_pos = current_pos + action * effective_scale
+            # apply_action (not set_joint_positions) so the command is
+            # actually driven through PhysX rather than teleported.
+            self._robot.get_articulation_controller().apply_action(
+                self._ArticulationAction(joint_positions=target_pos, joint_indices=self._joint_indices)
+            )
 
         self._world.step(render=(self.render_mode == "human"))
         self._step_count += 1
