@@ -52,13 +52,10 @@ env = URReachEnv(
 print("Checking environment...")
 check_env(env, warn=True)
 
-eval_env = URReachEnv(
-    render_mode=None,
-    action_scale=env_cfg.get("action_scale", 0.3),
-    target_radius=env_cfg.get("target_radius", 0.05),
-    reach_bonus=env_cfg.get("reach_bonus", 10.0),
-    max_episode_steps=env_cfg.get("max_episode_steps", 500),
-)
+# Isaac Sim's World is a process-wide singleton (one USD stage), so a second
+# URReachEnv can't build its own robot/ground without colliding with the
+# training env's prims. Reuse the same env for evaluation instead.
+eval_env = env
 
 callbacks = [
     EvalCallback(
