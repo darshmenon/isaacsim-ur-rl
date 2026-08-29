@@ -74,6 +74,7 @@ class URForceReachEnv(gym.Env):
         impedance_kp: float = 400.0,
         impedance_kd: float = 40.0,
         max_effort: float = 150.0,
+        attach_gripper: bool = True,
     ):
         super().__init__()
         if control_mode not in ("position", "impedance"):
@@ -129,12 +130,13 @@ class URForceReachEnv(gym.Env):
         )
 
         # UR10 robot
+        self._robot_root_path = "/World/UR10"
         self._robot = self._world.scene.add(
             UR10(
-                prim_path="/World/UR10",
+                prim_path=self._robot_root_path,
                 name="ur10",
                 position=np.array([0.0, 0.0, 0.0]),
-                attach_gripper=True,
+                attach_gripper=attach_gripper,
             )
         )
 
@@ -156,9 +158,20 @@ class URForceReachEnv(gym.Env):
         # because it doesn't require per-instance USD sensor authoring and
         # vectorizes cleanly if this env is later cloned (GridCloner) for a
         # multi-arm variant, mirroring ur_reach_multi_env.py.
+        #
+        # NOTE: robot.prim_path is NOT the link's parent Xform -- for this
+        # UR10 asset it resolves to ".../root_joint" (the articulation's fixed
+        # joint), so the wrist link path is built from the literal Xform path
+        # the robot was created under instead. filter_paths_expr must be a
+        # concrete prim, not a broad recursive glob like "/World/**" -- that
+        # matches the sensor's own body too and the physics tensor API
+        # rejects it ("did not match the correct number of entries").
+        # get_net_contact_forces() (used here) reports net force regardless
+        # of the filter target; the filter mainly matters for the pairwise
+        # get_contact_force_matrix()/get_contact_force_data() APIs.
         self._wrist_contact = RigidContactView(
-            prim_paths_expr=f"{self._robot.prim_path}/wrist_3_link",
-            filter_paths_expr=["/World/**"],
+            prim_paths_expr=f"{self._robot_root_path}/wrist_3_link",
+            filter_paths_expr=["/World/Ground"],
         )
 
         # --- Optional wrist camera (for observation.images.wrist) ---------
@@ -167,7 +180,7 @@ class URForceReachEnv(gym.Env):
             from isaacsim.sensors.camera import Camera
 
             self._camera = Camera(
-                prim_path=f"{self._robot.prim_path}/wrist_3_link/wrist_camera",
+                prim_path=f"{self._robot_root_path}/wrist_3_link/wrist_camera",
                 resolution=camera_resolution,
             )
 
@@ -181,12 +194,17 @@ class URForceReachEnv(gym.Env):
         self._joint_indices = np.arange(self._n_joints)
 
         if self._control_mode == "impedance":
-            # Zeros the drive's internal PD (Kp=Kd=0) for the arm joints so
-            # our manually computed torque isn't fought by the position
-            # drive -- see get_articulation_controller().apply_action() below.
-            self._robot.get_articulation_controller().switch_control_mode(
-                "effort", joint_indices=self._joint_indices
-            )
+            # Zeros the drive's internal PD (Kp=Kd=0) so our manually computed
+            # torque isn't fought by the position drive -- see
+            # get_articulation_controller().apply_action() below. NOTE: the
+            # high-level ArticulationController.switch_control_mode() wrapper
+            # (unlike the lower-level articulation view it delegates to)
+            # takes no joint_indices -- it applies to every DOF, gripper
+            # included. We only ever send joint_efforts for the 6 arm joints
+            # (via joint_indices in apply_action), so the now-driveless
+            # gripper joints simply go passive; acceptable since this task
+            # doesn't grasp anything yet.
+            self._robot.get_articulation_controller().switch_control_mode("effort")
         obs_dim = self._n_joints * 2 + 3 + 6  # qpos + qvel + target xyz + wrench
 
         joint_pos_hi = np.array([np.pi] * self._n_joints, dtype=np.float32)
@@ -260,6 +278,13 @@ class URForceReachEnv(gym.Env):
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
         self._world.reset()
+        # world.reset() invalidates the physics simulation view, so sensor
+        # views must be re-initialized after every reset, not just once in
+        # __init__ (see RigidContactView.initialize()'s docstring: "needs to
+        # be called after each hard reset").
+        self._wrist_contact.initialize()
+        if self._camera is not None:
+            self._camera.initialize()
         self._step_count = 0
 
         self._target_pos = self._randomize_target()
