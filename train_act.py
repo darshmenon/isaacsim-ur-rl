@@ -56,6 +56,8 @@ cmd = [
     f"--save_freq={tr.get('save_freq', 5000)}",
     f"--log_freq={tr.get('log_freq', 200)}",
     f"--num_workers={tr.get('num_workers', 4)}",
+    "--policy.push_to_hub=false",     # policies.py: push_to_hub defaults True
+    "--save_checkpoint_to_hub=false",  # fully local training, no HF Hub push
 ]
 
 print("Running:", " ".join(cmd))

@@ -136,7 +136,10 @@ virtualenv -p python3.12 .venv312   # stdlib `venv` needs python3.12-venv (ensur
 .venv/bin/python run_policy_act.py --checkpoint outputs/act_v0/checkpoints/last --headless
 ```
 
-Status: steps 1–3 verified working end-to-end (small smoketest: 2 episodes recorded, packaged, dataset loads back with correct shapes; `lerobot-train` command construction verified against its real `--help`). Step 4 has an unresolved architecture problem: `run_policy_act.py` needs to load an `ACTPolicy` (lerobot, py3.12) *inside* the Isaac Sim loop (py3.10) — the same version conflict, but this time there's no simple "write to disk and read separately" split since it's live inference. Needs its own design (e.g. IPC to a persistent `.venv312` subprocess, or reimplementing ACT inference with only `torch`) before milestone 4.
+**Viewing collected data**: `package_dataset.py` writes the wrist-camera footage as a standard mp4, playable in any video player:
+`datasets/<output_root>/videos/observation.images.wrist/chunk-000/file-000.mp4` (all episodes concatenated back-to-back, 224×224 @ the configured fps).
+
+Status: steps 1–3 verified working end-to-end on a real 20-episode run — data collected, packaged (14,820 frames), and a 3000-step ACT training run's loss dropped from ~12.5 to ~0.8. Step 4 has an unresolved architecture problem: `run_policy_act.py` needs to load an `ACTPolicy` (lerobot, py3.12) *inside* the Isaac Sim loop (py3.10) — the same version conflict, but this time there's no simple "write to disk and read separately" split since it's live inference. Needs its own design (e.g. IPC to a persistent `.venv312` subprocess, or reimplementing ACT inference with only `torch`) before milestone 4.
 
 ---
 

@@ -1,0 +1,21 @@
+# Modest real-run variant of act_train.yaml -- fewer steps, more frequent
+# logging, just to confirm the training loop runs and loss actually
+# decreases. Use act_train.yaml (20000 steps) for a full run later.
+
+dataset:
+  repo_id: isaacsim-ur-rl/reach-contact-v0
+  root: ./datasets/reach-contact-v0
+
+policy:
+  type: act
+  chunk_size: 100
+  n_action_steps: 100
+
+training:
+  output_dir: ./outputs/act_modest
+  batch_size: 8
+  steps: 3000
+  save_freq: 1500
+  log_freq: 50
+  num_workers: 4
+  device: cuda

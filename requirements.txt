@@ -15,4 +15,4 @@ torch>=2.2.0
 #   virtualenv -p python3.12 .venv312   # stdlib `venv` needs python3.12-venv
 #                                        # (ensurepip) which may not be
 #                                        # installed; virtualenv sidesteps it
-#   .venv312/bin/pip install -e "../lerobot[dataset]"
+#   .venv312/bin/pip install -e "../lerobot[dataset,training]"
