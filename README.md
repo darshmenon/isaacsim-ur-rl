@@ -108,25 +108,35 @@ env:
 Adds contact-force sensing and a fine-tuning pipeline on top of the reach task, toward fine-tuning an existing VLA/manipulation policy (LeRobot's ACT, then SmolVLA) rather than designing a new architecture from scratch.
 
 - **`envs/ur_force_env.py`** — `URForceReachEnv`, a 21-dim-observation variant of `URReachEnv` adding wrist contact force (via `RigidContactView`, force-only in v1) and two `control_mode`s: `"position"` (drive-based, with optional virtual-compliance `impedance_gain`) and `"impedance"` (true torque control: `switch_control_mode("effort")` + a manually computed `tau = Kp*(q_des-q) + Kd*(0-qdot)`, gains in `configs/env_force_reach.yaml`). Both modes command through `apply_action(...)` rather than `set_joint_positions()` (which teleports rather than physically drives — see `robocloud.md` for details), so contact/impedance behavior is physically grounded.
-- **`collect_data.py`** — rolls out episodes (using the trained SAC checkpoint from this repo as a cheap motion source) and records them into a `LeRobotDataset` (state + wrist RGB + action + task instruction).
-- **`train_act.py`** — thin wrapper around LeRobot's `lerobot-train` CLI to fine-tune ACT on the collected dataset. No LeRobot core changes needed — force channels ride along as extra `observation.state` dims.
+- **`collect_data.py`** — rolls out episodes using a scripted reach-to-target policy (Isaac Sim's ready-made `RMPFlowController` for this UR10 example) and dumps raw `.npz` episodes to disk (state + wrist RGB + action + task instruction). Runs under this repo's own `.venv` (Python 3.10).
+- **`package_dataset.py`** — reads those raw `.npz` files and builds a real `LeRobotDataset`. Runs under `.venv312` (Python 3.12, see below) — **not** the Isaac Sim `.venv`.
+- **`train_act.py`** — thin wrapper around LeRobot's `lerobot-train` CLI to fine-tune ACT on the packaged dataset. No LeRobot core changes needed — force channels ride along as extra `observation.state` dims. Runs under `.venv312`.
 - **`run_policy_act.py`** — closed-loop evaluation of the fine-tuned ACT policy in Isaac Sim (mirrors `run_policy.py`'s structure).
 - **`configs/env_force_reach.yaml`, `configs/act_train.yaml`, `configs/smolvla_train.yaml`** — env/training configs; SmolVLA is a documented phase-2 stretch goal, not wired to a training script yet.
 
-Requires a local `lerobot` checkout: `pip install -e ../lerobot`.
+**Two Python versions are required** — Isaac Sim is fixed at 3.10, but `lerobot` requires >=3.12 and pins an older torch, so it can't be installed into the Isaac Sim `.venv`. One-time setup for a second venv:
 
 ```bash
-# 1. Record a dataset
-python collect_data.py --headless --config configs/env_force_reach.yaml
-
-# 2. Fine-tune ACT
-python train_act.py --config configs/act_train.yaml
-
-# 3. Evaluate closed-loop
-python run_policy_act.py --checkpoint outputs/act_v0/checkpoints/last --headless
+virtualenv -p python3.12 .venv312   # stdlib `venv` needs python3.12-venv (ensurepip),
+                                     # which may be missing; virtualenv sidesteps that
+.venv312/bin/pip install -e "../lerobot[dataset]"
 ```
 
-Status: scaffolded, not yet verified end-to-end in Isaac Sim.
+```bash
+# 1. Record raw episodes (Isaac Sim .venv, py3.10)
+.venv/bin/python collect_data.py --headless --config configs/env_force_reach.yaml
+
+# 2. Package into a LeRobotDataset (.venv312, py3.12)
+.venv312/bin/python package_dataset.py --config configs/env_force_reach.yaml
+
+# 3. Fine-tune ACT (.venv312, py3.12)
+.venv312/bin/python train_act.py --config configs/act_train.yaml
+
+# 4. Evaluate closed-loop (Isaac Sim .venv, py3.10 -- see Status below)
+.venv/bin/python run_policy_act.py --checkpoint outputs/act_v0/checkpoints/last --headless
+```
+
+Status: steps 1–3 verified working end-to-end (small smoketest: 2 episodes recorded, packaged, dataset loads back with correct shapes; `lerobot-train` command construction verified against its real `--help`). Step 4 has an unresolved architecture problem: `run_policy_act.py` needs to load an `ACTPolicy` (lerobot, py3.12) *inside* the Isaac Sim loop (py3.10) — the same version conflict, but this time there's no simple "write to disk and read separately" split since it's live inference. Needs its own design (e.g. IPC to a persistent `.venv312` subprocess, or reimplementing ACT inference with only `torch`) before milestone 4.
 
 ---
 

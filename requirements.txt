@@ -5,9 +5,14 @@ pyyaml>=6.0
 tensorboard>=2.16.0
 torch>=2.2.0
 
-# LeRobot is used as an installed library (dataset format + ACT/SmolVLA
-# policies + lerobot-train CLI) by collect_data.py / train_act.py /
-# run_policy_act.py. Install from a local checkout:
-#   pip install -e ../lerobot
-# or pin a released version once this pipeline is stable:
-# lerobot>=0.x.x
+# --- LeRobot: needs a SEPARATE venv, not this one -------------------------
+# Isaac Sim requires Python 3.10 (this repo's .venv); lerobot requires
+# Python >=3.12 and pins torch<2.12 (conflicts with the torch this venv
+# already has) -- the two cannot coexist in one interpreter/venv.
+# collect_data.py (this .venv, py3.10) writes raw episodes to disk;
+# package_dataset.py / train_act.py / run_policy_act.py's policy loading
+# (a separate .venv312, py3.12) read/train/eval on them. One-time setup:
+#   virtualenv -p python3.12 .venv312   # stdlib `venv` needs python3.12-venv
+#                                        # (ensurepip) which may not be
+#                                        # installed; virtualenv sidesteps it
+#   .venv312/bin/pip install -e "../lerobot[dataset]"

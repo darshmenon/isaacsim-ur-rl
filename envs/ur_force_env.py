@@ -256,7 +256,7 @@ class URForceReachEnv(gym.Env):
         """RGB frame from the wrist camera, or None if disabled."""
         if self._camera is None:
             return None
-        return self._camera.get_rgba()[:, :, :3]
+        return self._camera.get_rgb()
 
     def _randomize_target(self) -> np.ndarray:
         r = self.np_random.uniform(0.25, 0.55)
@@ -293,6 +293,14 @@ class URForceReachEnv(gym.Env):
         for _ in range(10):  # settle
             self._world.step(render=False)
 
+        if self._camera is not None:
+            # The camera's rgb annotator needs a few render passes after
+            # initialize() before get_rgba() returns real data (returns an
+            # empty array otherwise) -- prime it here rather than on the
+            # first call to _get_wrist_image().
+            for _ in range(5):
+                self._world.step(render=True)
+
         return self._get_obs(), {}
 
     def step(self, action: np.ndarray):
@@ -322,7 +330,10 @@ class URForceReachEnv(gym.Env):
                 self._ArticulationAction(joint_positions=target_pos, joint_indices=self._joint_indices)
             )
 
-        self._world.step(render=(self.render_mode == "human"))
+        # Cameras need the render pipeline running to produce frames even in
+        # headless mode ("headless" only means no GUI window, not "no
+        # rendering") -- otherwise get_rgba() returns an empty buffer.
+        self._world.step(render=(self.render_mode == "human" or self._camera is not None))
         self._step_count += 1
 
         obs = self._get_obs()

@@ -1,9 +1,19 @@
 #!/usr/bin/env python3
-"""Roll out episodes in Isaac Sim and record them into a LeRobotDataset.
+"""Roll out episodes in Isaac Sim and dump them to raw .npz files on disk.
 
-Motion source is the existing trained SAC checkpoint from isaacsim-ur-rl
-(read-only), driving the new force-augmented env so we get contact-rich
-trajectories without having to script one by hand for v0.
+Isaac Sim requires Python 3.10 (this repo's .venv), but `lerobot` requires
+Python >=3.12 -- the two can't be imported in the same process. So this
+script does NOT depend on lerobot at all; it just writes raw per-episode
+arrays (state, action, wrist frames, task string). A separate script,
+package_dataset.py, run under .venv312 (which has lerobot installed),
+reads these raw files and builds the actual LeRobotDataset.
+
+Motion source is a scripted reach-to-target policy using Isaac Sim's
+ready-made RMPFlowController for this UR10 example (real Cartesian motion
+policy, not a hand-rolled heuristic). NOTE: the old SAC checkpoint from
+ur_reach_env.py was trained under teleport-based position control, so its
+actions don't transfer meaningfully to this env's real-dynamics control
+modes -- RMPFlow gives us actually task-directed demonstrations instead.
 
 Usage
 -----
@@ -50,94 +60,62 @@ env = URForceReachEnv(
     force_clip=env_cfg.get("force_clip", 200.0),
     enable_camera=env_cfg.get("enable_camera", True),
     camera_resolution=tuple(env_cfg.get("camera_resolution", (224, 224))),
+    attach_gripper=env_cfg.get("attach_gripper", False),
 )
 
-# --- Motion source: existing SAC checkpoint from the reach task -----------
-source_policy_path = col_cfg.get(
-    "source_policy", "models/ur10_reach_final.zip"
+# --- Motion source: scripted reach via RMPFlow (Cartesian motion policy) --
+from isaacsim.robot.manipulators.examples.universal_robots.controllers.rmpflow_controller import (
+    RMPFlowController,
 )
-policy = None
-if os.path.exists(source_policy_path):
-    from stable_baselines3 import SAC
-    policy = SAC.load(source_policy_path, env=None)
-    print(f"Loaded motion-source policy from {source_policy_path}")
-else:
-    print(
-        f"WARNING: source_policy '{source_policy_path}' not found — "
-        "falling back to random actions for this collection run."
-    )
 
-# --- LeRobotDataset setup ---------------------------------------------------
-from lerobot.datasets.lerobot_dataset import LeRobotDataset
-
-cam_h, cam_w = tuple(env_cfg.get("camera_resolution", (224, 224)))
-features = {
-    "observation.state": {
-        "dtype": "float32",
-        "shape": (21,),
-        "names": {
-            "axes": [
-                "joint_0", "joint_1", "joint_2", "joint_3", "joint_4", "joint_5",
-                "joint_vel_0", "joint_vel_1", "joint_vel_2", "joint_vel_3", "joint_vel_4", "joint_vel_5",
-                "target_x", "target_y", "target_z",
-                "force_x", "force_y", "force_z", "torque_x", "torque_y", "torque_z",
-            ],
-        },
-    },
-    "action": {
-        "dtype": "float32",
-        "shape": (6,),
-        "names": {"axes": [f"joint_delta_{i}" for i in range(6)]},
-    },
-}
-if env_cfg.get("enable_camera", True):
-    features["observation.images.wrist"] = {
-        "dtype": "video",
-        "shape": (cam_h, cam_w, 3),
-        "names": ["height", "width", "channels"],
-    }
-
-dataset = LeRobotDataset.create(
-    repo_id=col_cfg.get("repo_id", "ur10-force-vla/reach-contact-v0"),
-    fps=col_cfg.get("fps", 50),
-    root=col_cfg.get("output_root", "./datasets/reach-contact-v0"),
-    robot_type="ur10",
-    features=features,
-    use_videos=env_cfg.get("enable_camera", True),
+rmpflow = RMPFlowController(
+    name="rmpflow_demo",
+    robot_articulation=env._robot,
+    physics_dt=env_cfg.get("physics_dt", 1 / 500),
 )
+print("Using scripted RMPFlow reach-to-target as the demonstration source")
+
+raw_dir = col_cfg.get("raw_output_dir", "./datasets/raw_reach-contact-v0")
+os.makedirs(raw_dir, exist_ok=True)
 
 task_instruction = col_cfg.get("task_instruction", "reach the target and make light contact")
 n_episodes = col_cfg.get("n_episodes", 20)
+enable_camera = env_cfg.get("enable_camera", True)
 
 for ep in range(n_episodes):
     obs, _ = env.reset()
+    rmpflow.reset()
     done = False
-    step_i = 0
+    states, actions, frames = [], [], []
+
     while not done:
-        if policy is not None:
-            action, _ = policy.predict(obs[:15], deterministic=True)
-        else:
-            action = env.action_space.sample()
+        rmpflow_action = rmpflow.forward(target_end_effector_position=env._target_pos)
+        current_pos = env._robot.get_joint_positions()[:6]
+        joint_target = np.asarray(rmpflow_action.joint_positions)[:6]
+        action = np.clip((joint_target - current_pos) / env._action_scale, -1.0, 1.0).astype(np.float32)
 
-        frame = {
-            "observation.state": obs.astype(np.float32),
-            "action": np.asarray(action, dtype=np.float32),
-            "task": task_instruction,
-        }
-        if env_cfg.get("enable_camera", True):
-            frame["observation.images.wrist"] = env._get_wrist_image()
-
-        dataset.add_frame(frame)
+        states.append(obs.astype(np.float32))
+        actions.append(np.asarray(action, dtype=np.float32))
+        if enable_camera:
+            frames.append(env._get_wrist_image().copy())
 
         obs, reward, terminated, truncated, info = env.step(action)
         done = terminated or truncated
-        step_i += 1
 
-    dataset.save_episode()
-    print(f"Episode {ep + 1}/{n_episodes} recorded ({step_i} steps, reached={info['reached']})")
+    ep_path = os.path.join(raw_dir, f"ep_{ep:04d}.npz")
+    save_kwargs = dict(
+        states=np.stack(states),
+        actions=np.stack(actions),
+        task=task_instruction,
+    )
+    if enable_camera:
+        save_kwargs["frames"] = np.stack(frames)
+    np.savez_compressed(ep_path, **save_kwargs)
+    print(f"Episode {ep + 1}/{n_episodes} recorded ({len(states)} steps, reached={info['reached']}) -> {ep_path}")
 
-dataset.finalize()
-print(f"Dataset saved to {col_cfg.get('output_root', './datasets/reach-contact-v0')}")
+print(f"\nRaw episodes written to {raw_dir}")
+print("Next: package into a LeRobotDataset with (from .venv312):")
+print(f"  .venv312/bin/python package_dataset.py --config {args.config}")
 
 env.close()
 simulation_app.close()

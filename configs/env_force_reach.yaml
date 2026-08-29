@@ -6,7 +6,7 @@ env:
   target_radius: 0.05       # reach threshold (m)
   reach_bonus: 10.0
   action_scale: 0.3         # rad per step
-  control_mode: position    # "position" (drive-based, teleport-free) or "impedance" (true torque control)
+  control_mode: impedance   # "position" (drive-based, teleport-free) or "impedance" (true torque control, verified working)
   impedance_gain: 0.0       # position mode only: 0 = plain; >0 attenuates step by measured force (virtual compliance)
   force_clip: 200.0         # N, clip range for wrist force readings
 
@@ -19,11 +19,12 @@ env:
   max_effort: 150.0         # N*m, safety clip on commanded torque
   enable_camera: true
   camera_resolution: [224, 224]
+  attach_gripper: false     # gripper's fixed-joint attachment is flagged broken by PhysX; unneeded here (verified)
 
 collection:
-  source_policy: models/ur10_reach_final.zip
   task_instruction: "reach the target and make light contact"
   fps: 50
   n_episodes: 20
+  raw_output_dir: ./datasets/raw_reach-contact-v0  # written by collect_data.py (.venv, py3.10)
   repo_id: isaacsim-ur-rl/reach-contact-v0
-  output_root: ./datasets/reach-contact-v0
+  output_root: ./datasets/reach-contact-v0         # written by package_dataset.py (.venv312, py3.12)
