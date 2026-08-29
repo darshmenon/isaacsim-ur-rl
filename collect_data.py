@@ -8,12 +8,20 @@ arrays (state, action, wrist frames, task string). A separate script,
 package_dataset.py, run under .venv312 (which has lerobot installed),
 reads these raw files and builds the actual LeRobotDataset.
 
-Motion source is a scripted reach-to-target policy using Isaac Sim's
-ready-made RMPFlowController for this UR10 example (real Cartesian motion
-policy, not a hand-rolled heuristic). NOTE: the old SAC checkpoint from
-ur_reach_env.py was trained under teleport-based position control, so its
-actions don't transfer meaningfully to this env's real-dynamics control
-modes -- RMPFlow gives us actually task-directed demonstrations instead.
+Motion source is a simple proportional/bang-bang reach controller (NOT
+Isaac Sim's RMPFlowController -- diagnosed via an isolated live check that
+RMPFlowController.forward() returns bit-identical output regardless of the
+target position with attach_gripper=False; likely its preset "UR10"/
+"RMPflow" config's internal kinematic model doesn't match our gripper-less
+robot structure). Base-joint yaw is driven proportionally by the azimuthal
+angle error to the target; shoulder/elbow use the same periodic sign-flip
+(track dist-to-target, flip if not improving, lock once close) validated
+working for milestone-1 contact verification. Cruder than real IK, but
+target-differentiated and doesn't depend on RMPFlow's config matching this
+robot. NOTE: the old SAC checkpoint from ur_reach_env.py was trained under
+teleport-based position control, so its actions don't transfer meaningfully
+to this env's real-dynamics control modes either -- hence a fresh scripted
+source rather than reusing it.
 
 Usage
 -----
@@ -63,17 +71,19 @@ env = URForceReachEnv(
     attach_gripper=env_cfg.get("attach_gripper", False),
 )
 
-# --- Motion source: scripted reach via RMPFlow (Cartesian motion policy) --
-from isaacsim.robot.manipulators.examples.universal_robots.controllers.rmpflow_controller import (
-    RMPFlowController,
-)
+# --- Motion source: proportional yaw + bang-bang shoulder/elbow reach -----
+CHECK_INTERVAL = 150
+LOCK_DIST = 0.15  # once this close, stop sign-flipping and just hold direction
 
-rmpflow = RMPFlowController(
-    name="rmpflow_demo",
-    robot_articulation=env._robot,
-    physics_dt=env_cfg.get("physics_dt", 1 / 500),
-)
-print("Using scripted RMPFlow reach-to-target as the demonstration source")
+
+def azimuth_error(ee_pos, target_pos):
+    cur = np.arctan2(ee_pos[1], ee_pos[0])
+    tgt = np.arctan2(target_pos[1], target_pos[0])
+    err = tgt - cur
+    return (err + np.pi) % (2 * np.pi) - np.pi
+
+
+print("Using scripted proportional-yaw + bang-bang-reach as the demonstration source")
 
 raw_dir = col_cfg.get("raw_output_dir", "./datasets/raw_reach-contact-v0")
 os.makedirs(raw_dir, exist_ok=True)
@@ -84,15 +94,29 @@ enable_camera = env_cfg.get("enable_camera", True)
 
 for ep in range(n_episodes):
     obs, _ = env.reset()
-    rmpflow.reset()
     done = False
     states, actions, frames = [], [], []
+    sign = 1.0
+    best_dist = None
+    locked = False
+    step_i = 0
 
     while not done:
-        rmpflow_action = rmpflow.forward(target_end_effector_position=env._target_pos)
-        current_pos = env._robot.get_joint_positions()[:6]
-        joint_target = np.asarray(rmpflow_action.joint_positions)[:6]
-        action = np.clip((joint_target - current_pos) / env._action_scale, -1.0, 1.0).astype(np.float32)
+        ee_pos = env._get_ee_pos()
+        az_err = azimuth_error(ee_pos, env._target_pos)
+        dist = float(np.linalg.norm(ee_pos - env._target_pos))
+
+        if not locked and dist < LOCK_DIST:
+            locked = True
+        if not locked and step_i % CHECK_INTERVAL == 0:
+            if best_dist is not None and dist >= best_dist - 0.01:
+                sign *= -1.0
+            best_dist = dist
+
+        action = np.array(
+            [np.clip(az_err / (np.pi / 2), -1.0, 1.0), sign, sign, 0.0, 0.0, 0.0],
+            dtype=np.float32,
+        )
 
         states.append(obs.astype(np.float32))
         actions.append(np.asarray(action, dtype=np.float32))
@@ -101,6 +125,7 @@ for ep in range(n_episodes):
 
         obs, reward, terminated, truncated, info = env.step(action)
         done = terminated or truncated
+        step_i += 1
 
     ep_path = os.path.join(raw_dir, f"ep_{ep:04d}.npz")
     save_kwargs = dict(

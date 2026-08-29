@@ -2,10 +2,11 @@ env:
   robot: ur10
   physics_dt: 0.002         # 500 Hz
   rendering_dt: 0.02        # 50 Hz (every 10 physics steps)
-  max_episode_steps: 500    # 10 s at 50 Hz
+  max_episode_steps: 800    # 16 s at 50 Hz -- real dynamics need more time than the old teleport env did
   target_radius: 0.05       # reach threshold (m)
   reach_bonus: 10.0
-  action_scale: 0.3         # rad per step
+  action_scale: 0.6         # rad per step -- raised from 0.3 so impedance torque (Kp*action_scale) has more
+                            # authority for tracking the RMPFlow reference before hitting max_effort's clip
   control_mode: impedance   # "position" (drive-based, teleport-free) or "impedance" (true torque control, verified working)
   impedance_gain: 0.0       # position mode only: 0 = plain; >0 attenuates step by measured force (virtual compliance)
   force_clip: 200.0         # N, clip range for wrist force readings
