@@ -68,6 +68,10 @@ Live view (`view_openarm_live.py`):
 
 *Live graphs — tracking, |τ| vs limits, error, rolling saturation. Fixed a stale zero-order-hold torque bug (control was computed once per 50 Hz tick and held across physics substeps) plus a unit-mass damping assumption that ignored the wrist links' tiny inertia — both caused chronic 100% saturation and runaway tracking error on J1/J3/J5–J7. Now: RMS≈0.015 rad, 0% saturation.*
 
+![OpenArm live motor graphs, screen recording](docs/openarm_live_demo.gif)
+
+*Same live viewer in motion (screen recording, ~3.6× sped up) — clean tracking holding at 0% saturation.*
+
 ```bash
 .venv/bin/python -u analyze_openarm_motors.py
 OMNI_KIT_ACCEPT_EULA=YES .venv/bin/python -u analyze_openarm_isaac.py --headless
@@ -204,6 +208,18 @@ virtualenv -p python3.12 .venv312   # stdlib `venv` needs python3.12-venv (ensur
 `datasets/<output_root>/videos/observation.images.wrist/chunk-000/file-000.mp4` (all episodes concatenated back-to-back, 224×224 @ the configured fps).
 
 Status: steps 1–3 verified working end-to-end on a real 20-episode run — data collected, packaged (14,820 frames), and a 3000-step ACT training run's loss dropped from ~12.5 to ~0.8. Step 4 has an unresolved architecture problem: `run_policy_act.py` needs to load an `ACTPolicy` (lerobot, py3.12) *inside* the Isaac Sim loop (py3.10) — the same version conflict, but this time there's no simple "write to disk and read separately" split since it's live inference. Needs its own design (e.g. IPC to a persistent `.venv312` subprocess, or reimplementing ACT inference with only `torch`) before milestone 4.
+
+### π₀ (OpenPI) fine-tune — alternate VLA backbone
+
+`train_pi0.py` fine-tunes [OpenPI](https://github.com/Physical-Intelligence/openpi) π₀ / π₀.₅ on the same packaged reach-contact dataset, as an alternative to the ACT path above. Runs against a separate OpenPI checkout at `~/openpi` (its own `.venv` — not Isaac Sim's `.venv` or `.venv312`), using LoRA by default (`pi0_ur10_reach_lora`, ~22GB+ VRAM) with a full-finetune config (`pi0_ur10_reach`, ~70GB) also available.
+
+```bash
+# uses the packaged LeRobotDataset from step 2 above
+python train_pi0.py --config configs/pi0_train.yaml
+python train_pi0.py --dry-run   # print commands without running
+```
+
+Status: scaffold only — not yet run end-to-end. `config_name` in `configs/pi0_train.yaml` must match a `TrainConfig.name` registered in OpenPI's `training/config.py`.
 
 ---
 
