@@ -66,7 +66,7 @@ Live view (`view_openarm_live.py`):
 
 ![OpenArm live motor graphs](docs/openarm_live_graphs.png)
 
-*Live graphs — tracking, |τ| vs limits, error, rolling saturation (wrist J5–J7 at 100%).*
+*Live graphs — tracking, |τ| vs limits, error, rolling saturation. Fixed a stale zero-order-hold torque bug (control was computed once per 50 Hz tick and held across physics substeps) plus a unit-mass damping assumption that ignored the wrist links' tiny inertia — both caused chronic 100% saturation and runaway tracking error on J1/J3/J5–J7. Now: RMS≈0.015 rad, 0% saturation.*
 
 ```bash
 .venv/bin/python -u analyze_openarm_motors.py
