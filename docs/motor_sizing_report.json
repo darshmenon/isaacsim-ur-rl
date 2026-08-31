@@ -1,0 +1,138 @@
+{
+  "max_efforts_Nm": [
+    330.0,
+    330.0,
+    150.0,
+    56.0,
+    56.0,
+    56.0
+  ],
+  "recommended_kp": 80.0,
+  "recommended_kd": 17.88854381999832,
+  "joints": {
+    "J1": {
+      "peak_tau_Nm": 12.727121423271239,
+      "rms_tau_Nm": 8.99340309398231,
+      "energy_J": 0.0015354187774768663,
+      "rms_tracking_rad": 0.10606592634931651,
+      "limit_Nm": 330.0,
+      "suggest_cont_Nm": 13.490104640973467,
+      "suggest_peak_Nm": 15.272545707925486
+    },
+    "J2": {
+      "peak_tau_Nm": 210.77386560203155,
+      "rms_tau_Nm": 201.0459730335167,
+      "energy_J": 0.1329736062313898,
+      "rms_tracking_rad": 1.0146372899968146,
+      "limit_Nm": 330.0,
+      "suggest_cont_Nm": 301.56895955027505,
+      "suggest_peak_Nm": 252.92863872243785
+    },
+    "J3": {
+      "peak_tau_Nm": 81.41943746381368,
+      "rms_tau_Nm": 72.1851804643312,
+      "energy_J": 0.09557022504313249,
+      "rms_tracking_rad": 1.3160055169646627,
+      "limit_Nm": 150.0,
+      "suggest_cont_Nm": 108.27777069649679,
+      "suggest_peak_Nm": 97.70332495657641
+    },
+    "J4": {
+      "peak_tau_Nm": 56.0,
+      "rms_tau_Nm": 56.0,
+      "energy_J": 0.21255912298569457,
+      "rms_tracking_rad": 1.5269358183907955,
+      "limit_Nm": 56.0,
+      "suggest_cont_Nm": 56.0,
+      "suggest_peak_Nm": 56.0
+    },
+    "J5": {
+      "peak_tau_Nm": 56.0,
+      "rms_tau_Nm": 51.42919086001764,
+      "energy_J": 0.10126319605264764,
+      "rms_tracking_rad": 0.6492489949739652,
+      "limit_Nm": 56.0,
+      "suggest_cont_Nm": 56.0,
+      "suggest_peak_Nm": 56.0
+    },
+    "J6": {
+      "peak_tau_Nm": 43.099815380778566,
+      "rms_tau_Nm": 32.519837918484285,
+      "energy_J": 0.7887291047535954,
+      "rms_tracking_rad": 0.40552835202522025,
+      "limit_Nm": 56.0,
+      "suggest_cont_Nm": 48.77975687772643,
+      "suggest_peak_Nm": 51.71977845693428
+    }
+  },
+  "controller_comparison": {
+    "baseline": {
+      "mean_rms_rad": 0.9540254968936023,
+      "peak_tau_Nm": 113.85840160562671,
+      "mean_abs_power_W": 1.8371409942482906,
+      "saturation_frac": 1.0
+    },
+    "ff": {
+      "mean_rms_rad": 0.9476132417470452,
+      "peak_tau_Nm": 114.57185435218781,
+      "mean_abs_power_W": 0.051798862625903365,
+      "saturation_frac": 1.0
+    },
+    "ff_g": {
+      "mean_rms_rad": 0.9449261573638806,
+      "peak_tau_Nm": 210.70229259395472,
+      "mean_abs_power_W": 0.5043197870029544,
+      "saturation_frac": 1.0
+    }
+  },
+  "gain_sweep": {
+    "40.0": {
+      "mean_rms_rad": 0.8642979133451784,
+      "peak_tau_Nm": 166.06393402097677,
+      "mean_abs_power_W": 3.3414563950279934,
+      "saturation_frac": 0.69
+    },
+    "60.0": {
+      "mean_rms_rad": 0.845092454263335,
+      "peak_tau_Nm": 188.32893218061207,
+      "mean_abs_power_W": 0.2982279173903801,
+      "saturation_frac": 1.0
+    },
+    "80.0": {
+      "mean_rms_rad": 0.8364036497834624,
+      "peak_tau_Nm": 210.77386560203155,
+      "mean_abs_power_W": 0.05552627807683069,
+      "saturation_frac": 1.0
+    },
+    "120.0": {
+      "mean_rms_rad": 0.8364227483008667,
+      "peak_tau_Nm": 255.63922765279946,
+      "mean_abs_power_W": 0.03778826259570359,
+      "saturation_frac": 1.0
+    },
+    "160.0": {
+      "mean_rms_rad": 0.8364227468120952,
+      "peak_tau_Nm": 300.4863027664969,
+      "mean_abs_power_W": 0.03837154201852209,
+      "saturation_frac": 1.0
+    }
+  },
+  "compliance_k_est_N_per_m": {
+    "soft": NaN,
+    "stiff": NaN
+  },
+  "ik_errors_m": [
+    0.0017276320685821395,
+    0.002400978316587712,
+    0.0009488887727653662
+  ],
+  "gravity_sample_Nm": [
+    -3.7780337152071297e-06,
+    -11.331899642944336,
+    -35.439517974853516,
+    -1.6736277341842651,
+    -0.00802048109471798,
+    2.4776392049119522e-09
+  ],
+  "notes": "Torques are clipped to PhysX max_efforts. Prefer runs with low saturation_frac."
+}

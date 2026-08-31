@@ -6,6 +6,8 @@
 
 Reinforcement learning for UR arm reach and pick-and-place tasks in **NVIDIA Isaac Sim**, using **SAC** (Stable Baselines 3) with a custom gym environment backed by the Isaac Sim physics engine.
 
+![Isaac Sim 4.5 motion simulation](docs/isaac_sim_premiere.png)
+
 ![UR10 reach task training in Isaac Sim](docs/isaac_sim_screenshot.png)
 
 ---
@@ -16,6 +18,30 @@ Reinforcement learning for UR arm reach and pick-and-place tasks in **NVIDIA Isa
 - Multi-arm variant (`ur_reach_multi_env.py`) for parallel training across several robot instances
 - Saves checkpoints every 50k steps; best model saved automatically via `EvalCallback`
 - Runs trained policies in visual or headless mode
+
+---
+
+## Impedance & motor analysis
+
+Effort-mode joint impedance on the UR10, with stiff/soft gain comparison and a fuller tracking / torque / compliance / IK pack. Cross-checked with **Drake** inverse dynamics on the same UR10 URDF.
+
+![UR10 impedance motor analysis — stiff vs soft](docs/impedance_motor_analysis.png)
+
+*Stiff vs soft impedance: tracking error, motor torque, and mechanical power (`analyze_impedance_motors.py`).*
+
+![UR10 impedance full-pack analysis](docs/impedance_full_pack_analysis.png)
+
+*Isaac full pack with gravity enabled and τ clipped to UR max efforts (`analyze_impedance_full_pack.py`).*
+
+![Drake UR10 dynamics reference](docs/drake_dynamics_analysis.png)
+
+*Drake reference: gravity, inverse-dynamics torque envelope vs datasheet limits, IK (`analyze_dynamics_drake.py`).*
+
+```bash
+OMNI_KIT_ACCEPT_EULA=YES .venv/bin/python -u analyze_impedance_motors.py --headless
+OMNI_KIT_ACCEPT_EULA=YES .venv/bin/python -u analyze_impedance_full_pack.py --headless
+.venv/bin/python -u analyze_dynamics_drake.py   # no Isaac / GPU needed
+```
 
 ---
 

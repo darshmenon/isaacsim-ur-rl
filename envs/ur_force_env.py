@@ -223,6 +223,8 @@ class URForceReachEnv(gym.Env):
 
         self._target_pos = np.array([0.4, 0.0, 0.4], dtype=np.float32)
         self._last_wrench = np.zeros(6, dtype=np.float32)
+        self._last_tau = np.zeros(self._n_joints, dtype=np.float32)
+        self._last_q_des = np.zeros(self._n_joints, dtype=np.float32)
 
     # ------------------------------------------------------------------
     # Helpers
@@ -311,10 +313,14 @@ class URForceReachEnv(gym.Env):
             q_des = current_pos + action * self._action_scale
             tau = self._impedance_kp * (q_des - current_pos) + self._impedance_kd * (0.0 - current_vel)
             tau = np.clip(tau, -self._max_effort, self._max_effort)
+            self._last_tau = tau.astype(np.float32)
+            self._last_q_des = q_des.astype(np.float32)
             self._robot.get_articulation_controller().apply_action(
                 self._ArticulationAction(joint_efforts=tau, joint_indices=self._joint_indices)
             )
         else:
+            self._last_tau[:] = 0.0
+            self._last_q_des = (current_pos + action * self._action_scale).astype(np.float32)
             # Optionally attenuate the commanded step by measured contact
             # force (virtual compliance). With impedance_gain == 0 this is
             # plain position control.
@@ -352,6 +358,10 @@ class URForceReachEnv(gym.Env):
             "dist": dist,
             "reached": reached,
             "wrench": self._last_wrench.copy(),
+            "tau": self._last_tau.copy(),
+            "q_des": self._last_q_des.copy(),
+            "q": self._robot.get_joint_positions()[: self._n_joints].astype(np.float32),
+            "qd": self._robot.get_joint_velocities()[: self._n_joints].astype(np.float32),
         }
         return obs, reward, terminated, truncated, info
 
