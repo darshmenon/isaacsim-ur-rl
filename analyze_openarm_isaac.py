@@ -205,8 +205,15 @@ def apply_tau(tau7: np.ndarray) -> None:
     )
 
 
-def step_world(n: int = STEPS_PER) -> None:
+def hold_at(q_des: np.ndarray, kit: dict, n: int = STEPS_PER) -> None:
+    """Recompute PD+gravity torque every physics substep (not once and held
+    across STEPS_PER substeps) — a stale qfrc_bias/velocity-feedback torque
+    held across substeps is what caused the MuJoCo OpenArm PD loop to go
+    numerically unstable on the low-inertia wrist joints; same fix here."""
     for _ in range(n):
+        tau = pd_torque(get_q(), get_qd(), q_des, get_g())
+        tau = np.clip(tau, -kit["tau_lim"], kit["tau_lim"])
+        apply_tau(tau)
         world.step(render=not args.headless)
 
 
@@ -217,20 +224,14 @@ if np.linalg.norm(g0) < 0.5:
 
 # Park near home
 for _ in range(int(1.5 * HZ)):
-    tau = pd_torque(get_q(), get_qd(), Q_HOME, get_g())
-    tau = np.clip(tau, -MOTOR_KITS["damiao_v2"]["tau_lim"], MOTOR_KITS["damiao_v2"]["tau_lim"])
-    apply_tau(tau)
-    step_world()
+    hold_at(Q_HOME, MOTOR_KITS["damiao_v2"])
 print("parked q:", np.round(get_q(), 3))
 
 
 def run_kit(name: str, kit: dict) -> dict:
     # re-park lightly
     for _ in range(int(0.5 * HZ)):
-        tau = pd_torque(get_q(), get_qd(), Q_HOME, get_g())
-        tau = np.clip(tau, -kit["tau_lim"], kit["tau_lim"])
-        apply_tau(tau)
-        step_world()
+        hold_at(Q_HOME, kit)
 
     t = np.zeros(N)
     q_log = np.zeros((N, N_ARM))
@@ -238,16 +239,20 @@ def run_kit(name: str, kit: dict) -> dict:
     err_log = np.zeros((N, N_ARM))
     sat_log = np.zeros((N, N_ARM), dtype=bool)
 
+    sub_dt = 1.0 / HZ / STEPS_PER
     for i in range(N):
         ti = i / HZ
-        qdes = q_ref_at(ti)
-        q = get_q()
-        qd = get_qd()
-        tau_cmd = pd_torque(q, qd, qdes, get_g())
-        tau = np.clip(tau_cmd, -kit["tau_lim"], kit["tau_lim"])
-        sat = np.abs(tau_cmd) > kit["tau_lim"] + 1e-9
-        apply_tau(tau)
-        step_world()
+        # Recompute torque every physics substep (not once and held across
+        # STEPS_PER substeps) — see hold_at().
+        for k in range(STEPS_PER):
+            qdes = q_ref_at(ti + k * sub_dt)
+            q = get_q()
+            qd = get_qd()
+            tau_cmd = pd_torque(q, qd, qdes, get_g())
+            tau = np.clip(tau_cmd, -kit["tau_lim"], kit["tau_lim"])
+            sat = np.abs(tau_cmd) > kit["tau_lim"] + 1e-9
+            apply_tau(tau)
+            world.step(render=not args.headless)
 
         t[i] = ti
         q_log[i] = q
