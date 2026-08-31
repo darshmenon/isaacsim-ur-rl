@@ -28,8 +28,12 @@
   `docs/openarm_isaac_motor_comparison.{md,png,json}`
 - **OpenArm fixes**: soft motion + per-joint PD in `openarm_motor_common.py`;
   MuJoCo now sizes via **inverse-dynamics peak τ** (Damiao fits with ≥6.5× headroom
-  on soft sine; weak hobby fails J2). Closed-loop sat was PD windup — not true motor need.
-  Isaac gravity still ~0 after USD/view enable (known gap).
+  on soft sine; weak hobby fails J2). Closed-loop sat was mostly a zero-order-hold
+  bug (torque held stale across physics substeps) + unit-mass damping gains ignoring
+  the wrist links' tiny inertia — fixed in MuJoCo and Isaac, sat now 0% for Damiao.
+  Isaac gravity-forces *readout* (`get_generalized_gravity_forces`) still reads ~0
+  even though gravity is verified real in the physics (zero-torque free-fall moved
+  the arm 2.1 rad in 1s) — a tensor-API bug, not a "gravity disabled" issue.
 
 ## What’s left
 1. Fix Isaac contact force readout (pad collision filter / contact API)
@@ -38,7 +42,9 @@
 4. Cartesian / OSC impedance (optional)
 5. Premiere MP4 export
 6. Optional: Isaac Lab OpenArm bringup (beyond MuJoCo motor kits)
-7. OpenArm Isaac gravity still near-zero after enable — dig into body flags
+7. OpenArm Isaac gravity-forces readout still near-zero — root cause narrowed
+   to a tensor-API bug (physics itself confirmed correct via free-torque
+   free-fall test); needs Isaac Sim source/issue-tracker digging to fix
 
 ## Commands
 ```bash

@@ -156,6 +156,14 @@ if hasattr(robot, "enable_gravity"):
 for _ in range(30):
     world.step(render=False)
 
+try:
+    body_names = list(view.body_names)
+    body_masses = np.asarray(view.get_body_masses()).reshape(-1)
+    print("body_names:", body_names)
+    print("body_masses:", np.round(body_masses, 4))
+except Exception as e:
+    print(f"WARN body_masses: {e}")
+
 dof_names = list(robot.dof_names)
 print("dof_names:", dof_names)
 left_idx = []
@@ -188,6 +196,18 @@ def get_qd() -> np.ndarray:
 
 
 def get_g() -> np.ndarray:
+    """Gravity/Coriolis feedforward for pd_torque().
+
+    KNOWN BUG: get_generalized_gravity_forces() returns near-zero here even
+    though gravity is verified real in the actual simulation (a zero-torque
+    free-fall test moved the arm |dq|=2.1 rad in 1s — see robocloud.md).
+    Scene gravity, body masses, and body COM offsets were all checked and are
+    correct, so this looks like an Isaac Sim tensor-API readout bug specific
+    to this articulation, not a "gravity is disabled" problem. Effect: the
+    PD controller below runs with ~zero gravity feedforward, i.e. plain PD;
+    it still tracks reasonably because the spring gains are strong enough to
+    hold this light arm against gravity on their own.
+    """
     try:
         g = np.asarray(view.get_generalized_gravity_forces(), dtype=np.float64).reshape(-1)
         return np.nan_to_num(g[left_idx], nan=0.0)
@@ -216,6 +236,24 @@ def hold_at(q_des: np.ndarray, kit: dict, n: int = STEPS_PER) -> None:
         apply_tau(tau)
         world.step(render=not args.headless)
 
+
+try:
+    com_pos, _ = view.get_body_coms()
+    com_pos = np.asarray(com_pos).reshape(len(body_names), 3)
+    print("body local COM offsets:")
+    for bn, c in zip(body_names, com_pos):
+        print(f"  {bn:28s} {np.round(c, 4)}")
+except Exception as e:
+    print(f"WARN body_coms: {e}")
+try:
+    print("physics_context gravity:", world.get_physics_context().get_gravity())
+except Exception as e:
+    print(f"WARN physics_context gravity: {e}")
+try:
+    g_all = np.asarray(view.get_generalized_gravity_forces(), dtype=np.float64).reshape(-1)
+    print("gravity (ALL dofs, raw):", np.round(g_all, 3))
+except Exception as e:
+    print(f"WARN raw gravity: {e}")
 
 g0 = get_g()
 print(f"gravity @ reset (left): {np.round(g0, 2)}  |g|={np.linalg.norm(g0):.2f}")
