@@ -47,6 +47,7 @@ from openarm_motor_common import (
     make_spring,
     pd_torque,
     q_ref_at,
+    set_kit_ctrlrange,
 )
 
 DEFAULT_MJCF = Path.home() / "openarm_mujoco" / "v1" / "openarm.xml"
@@ -98,6 +99,8 @@ def main() -> None:
     preset_i = PRESET_ORDER.index(preset) if preset in PRESET_ORDER else 1
     paused = False
     t_sim = 0.0
+
+    set_kit_ctrlrange(model, MOTOR_KITS[KIT_ORDER[kit_i]]["tau_lim"])
 
     def refresh_spring():
         nonlocal kp, kd
@@ -179,9 +182,11 @@ def main() -> None:
             nonlocal kit_i, preset_i, scale, damp_ratio, paused, t_sim
             if keycode in (258, ord("N"), ord("n")):
                 kit_i = (kit_i + 1) % len(KIT_ORDER)
+                set_kit_ctrlrange(model, MOTOR_KITS[KIT_ORDER[kit_i]]["tau_lim"])
                 print("kit ->", MOTOR_KITS[KIT_ORDER[kit_i]]["label"])
             elif keycode in (ord("B"), ord("b"), ord("P"), ord("p")):
                 kit_i = (kit_i - 1) % len(KIT_ORDER)
+                set_kit_ctrlrange(model, MOTOR_KITS[KIT_ORDER[kit_i]]["tau_lim"])
                 print("kit ->", MOTOR_KITS[KIT_ORDER[kit_i]]["label"])
             elif keycode == ord("["):
                 scale = max(0.05, scale * 0.8)
@@ -224,21 +229,27 @@ def main() -> None:
             lim = kit["tau_lim"]
 
             if not paused:
-                qdes = q_ref_at(t_sim)
-                tau_cmd = pd_torque(
-                    data.qpos[:N_ARM],
-                    data.qvel[:N_ARM],
-                    qdes,
-                    data.qfrc_bias[:N_ARM].copy(),
-                    kp=kp,
-                    kd=kd,
-                )
-                tau = np.clip(tau_cmd, -lim, lim)
-                sat = np.abs(tau_cmd) > lim + 1e-9
-                data.ctrl[:N_ARM] = tau
-                data.ctrl[N_ARM:] = 0.0
+                # Recompute the PD+gravity torque every physics substep (not
+                # just once per control tick) — holding a stale qfrc_bias/
+                # velocity-feedback torque across ~10 substeps at 500 Hz is
+                # what caused the runaway saturation/instability, especially
+                # on the low-inertia wrist joints.
                 n_sub = max(1, int(round(ctrl_dt / model.opt.timestep)))
-                for _ in range(n_sub):
+                sub_dt = model.opt.timestep
+                for k in range(n_sub):
+                    qdes = q_ref_at(t_sim + k * sub_dt)
+                    tau_cmd = pd_torque(
+                        data.qpos[:N_ARM],
+                        data.qvel[:N_ARM],
+                        qdes,
+                        data.qfrc_bias[:N_ARM].copy(),
+                        kp=kp,
+                        kd=kd,
+                    )
+                    tau = np.clip(tau_cmd, -lim, lim)
+                    sat = np.abs(tau_cmd) > lim + 1e-9
+                    data.ctrl[:N_ARM] = tau
+                    data.ctrl[N_ARM:] = 0.0
                     mujoco.mj_step(model, data)
                 t_sim += ctrl_dt
 

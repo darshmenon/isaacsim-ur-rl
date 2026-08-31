@@ -24,7 +24,17 @@ FREQ = np.array([0.18, 0.20, 0.18, 0.22, 0.20, 0.18, 0.20], dtype=np.float64)
 
 # Default soft closed-loop spring (demo only — not for motor peak sizing)
 KP = np.array([25.0, 25.0, 18.0, 18.0, 10.0, 10.0, 10.0], dtype=np.float64)
-KD = 2.0 * np.sqrt(KP)
+
+# Diagonal of the joint-space mass matrix at Q_HOME (measured via MuJoCo
+# mj_fullM on ~/openarm_mujoco/v1/openarm.xml). Wrist links (J5-J7) are as
+# light as ~0.001-0.005 kg*m^2, ~2 orders of magnitude below J1/J2. Unit-mass
+# critical damping (kd=2*sqrt(kp)) is wildly oversized there, which combined
+# with a coarse control-rate zero-order hold on qfrc_bias/velocity feedback
+# makes the loop numerically unstable (see run_openarm loops: control must be
+# recomputed every physics substep, not held across substeps).
+INERTIA_EST = np.array([0.136, 0.300, 0.064, 0.088, 0.00105, 0.00478, 0.00429], dtype=np.float64)
+
+KD = 2.0 * np.sqrt(KP * INERTIA_EST)
 
 # Named spring profiles: scale on the default per-joint spring vector
 SPRING_PRESETS = {
@@ -56,6 +66,18 @@ MOTOR_KITS = {
         "color": "#9467bd",
     },
 }
+
+
+def set_kit_ctrlrange(model, tau_lim: np.ndarray) -> None:
+    """Sync MuJoCo actuator ctrlrange to the selected kit's torque limits.
+
+    The MJCF bakes in a fixed +-10/12 N.m ctrlrange; without this, MuJoCo
+    silently clamps data.ctrl there regardless of which kit is selected,
+    making every kit comparison identical and starving the PD+g loop of
+    authority once tracking error grows.
+    """
+    model.actuator_ctrlrange[:N_ARM, 0] = -tau_lim
+    model.actuator_ctrlrange[:N_ARM, 1] = tau_lim
 
 
 def q_ref_at(t: float) -> np.ndarray:
@@ -99,7 +121,7 @@ def make_spring(
     if scale is not None:
         k = k * float(scale)
     if kd is None:
-        d = 2.0 * float(damp_ratio) * np.sqrt(np.maximum(k, 1e-9))
+        d = 2.0 * float(damp_ratio) * np.sqrt(np.maximum(k, 1e-9) * INERTIA_EST)
     else:
         d = np.broadcast_to(np.asarray(kd, dtype=np.float64), (N_ARM,)).copy()
     return k, d

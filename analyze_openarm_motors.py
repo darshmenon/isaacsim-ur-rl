@@ -36,6 +36,7 @@ from openarm_motor_common import (
     qd_ref_at,
     qdd_ref_at,
     q_ref_at,
+    set_kit_ctrlrange,
 )
 
 ROOT = Path(__file__).resolve().parent
@@ -67,6 +68,7 @@ def id_envelope(model: mujoco.MjModel, seconds: float, hz: float) -> dict:
 
 
 def run_closed_loop(model: mujoco.MjModel, kit: dict, seconds: float, hz: float) -> dict:
+    set_kit_ctrlrange(model, kit["tau_lim"])
     data = mujoco.MjData(model)
     n_steps = int(seconds * hz)
     sim_substeps = max(1, int(round(1.0 / (hz * model.opt.timestep))))
@@ -74,14 +76,19 @@ def run_closed_loop(model: mujoco.MjModel, kit: dict, seconds: float, hz: float)
 
     data.qpos[:N_ARM] = Q_HOME
     mujoco.mj_forward(model, data)
+    sub_dt = model.opt.timestep
+    # Torque is recomputed every physics substep, not held across
+    # sim_substeps — a stale qfrc_bias/velocity-feedback torque held across
+    # ~10 substeps at 500 Hz is numerically unstable on the low-inertia
+    # wrist joints (see INERTIA_EST in openarm_motor_common.py).
     for _ in range(int(1.5 * hz)):
-        tau = pd_torque(
-            data.qpos[:N_ARM], data.qvel[:N_ARM], Q_HOME, data.qfrc_bias[:N_ARM].copy()
-        )
-        tau = np.clip(tau, -kit["tau_lim"], kit["tau_lim"])
-        data.ctrl[:N_ARM] = tau
-        data.ctrl[N_ARM:] = 0.0
         for _ in range(sim_substeps):
+            tau = pd_torque(
+                data.qpos[:N_ARM], data.qvel[:N_ARM], Q_HOME, data.qfrc_bias[:N_ARM].copy()
+            )
+            tau = np.clip(tau, -kit["tau_lim"], kit["tau_lim"])
+            data.ctrl[:N_ARM] = tau
+            data.ctrl[N_ARM:] = 0.0
             mujoco.mj_step(model, data)
 
     t = np.zeros(n_steps)
@@ -91,15 +98,15 @@ def run_closed_loop(model: mujoco.MjModel, kit: dict, seconds: float, hz: float)
 
     for i in range(n_steps):
         ti = i / hz
-        q_des = q_ref_at(ti)
-        tau_cmd = pd_torque(
-            data.qpos[:N_ARM], data.qvel[:N_ARM], q_des, data.qfrc_bias[:N_ARM].copy()
-        )
-        tau = np.clip(tau_cmd, -kit["tau_lim"], kit["tau_lim"])
-        sat = np.abs(tau_cmd) > kit["tau_lim"] + 1e-9
-        data.ctrl[:N_ARM] = tau
-        data.ctrl[N_ARM:] = 0.0
-        for _ in range(sim_substeps):
+        for k in range(sim_substeps):
+            q_des = q_ref_at(ti + k * sub_dt)
+            tau_cmd = pd_torque(
+                data.qpos[:N_ARM], data.qvel[:N_ARM], q_des, data.qfrc_bias[:N_ARM].copy()
+            )
+            tau = np.clip(tau_cmd, -kit["tau_lim"], kit["tau_lim"])
+            sat = np.abs(tau_cmd) > kit["tau_lim"] + 1e-9
+            data.ctrl[:N_ARM] = tau
+            data.ctrl[N_ARM:] = 0.0
             mujoco.mj_step(model, data)
         t[i] = ti
         err_log[i] = q_des - data.qpos[:N_ARM]

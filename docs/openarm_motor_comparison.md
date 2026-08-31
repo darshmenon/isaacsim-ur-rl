@@ -29,9 +29,9 @@ Model: `/home/asimov/openarm_mujoco/v1/openarm.xml`. Soft sine amp=[0.1  0.08 0.
 
 | kit | mean RMS | mean sat % |
 |---|---:|---:|
-| Damiao v2 (DM8009/4340/4310) | 0.8341 | 78.6 |
-| Equal ±10 N·m (v1 default) | 0.8072 | 87.0 |
-| Weak hobby (±5/3/1.5) | 0.4141 | 81.9 |
-| Strong upgrade (±60/40/15) | 0.8731 | 75.0 |
+| Damiao v2 (DM8009/4340/4310) | 0.0096 | 0.0 |
+| Equal ±10 N·m (v1 default) | 0.0096 | 0.0 |
+| Weak hobby (±5/3/1.5) | 0.1660 | 14.3 |
+| Strong upgrade (±60/40/15) | 0.0096 | 0.0 |
 
 Plot: `openarm_motor_comparison.png`
