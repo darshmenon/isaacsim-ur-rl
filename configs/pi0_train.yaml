@@ -1,0 +1,19 @@
+# π₀ LoRA fine-tune on the local reach-contact LeRobot dataset via OpenPI
+# (/home/asimov/openpi). Consumed by train_pi0.py.
+#
+# Needs a GPU with ~22GB+ VRAM for LoRA (RTX 4090 class). Full finetune
+# (config_name: pi0_ur10_reach) needs ~70GB.
+
+openpi_root: /home/asimov/openpi
+
+# Must match a TrainConfig.name registered in openpi's training/config.py
+config_name: pi0_ur10_reach_lora
+
+exp_name: ur10_reach_v0
+
+# Passed through as --overwrite when true (allows reusing the same exp dir)
+overwrite: true
+
+# Optional: compute norm stats first (recommended once per dataset)
+#   cd /home/asimov/openpi && .venv/bin/python scripts/compute_norm_stats.py --config-name=pi0_ur10_reach_lora
+compute_norm_stats: false

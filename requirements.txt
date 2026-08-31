@@ -16,3 +16,10 @@ torch>=2.2.0
 #                                        # (ensurepip) which may not be
 #                                        # installed; virtualenv sidesteps it
 #   .venv312/bin/pip install -e "../lerobot[dataset,training]"
+#
+# --- OpenPI π₀ (third venv under /home/asimov/openpi/.venv) ---------------
+# train_pi0.py launches OpenPI's scripts/train.py with TrainConfig
+# pi0_ur10_reach_lora. Already installed via:
+#   cd ~/openpi && GIT_LFS_SKIP_SMUDGE=1 uv sync && GIT_LFS_SKIP_SMUDGE=1 uv pip install -e .
+#   python train_pi0.py --dry-run
+# ----------------------------------------------------------------------
