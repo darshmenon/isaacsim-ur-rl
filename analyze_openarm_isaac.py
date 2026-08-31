@@ -123,6 +123,13 @@ print(f"URDF import status={status} prim={prim_path}")
 if not prim_path:
     # Fallback common root name from robot name=
     prim_path = "/openarm"
+elif Path(str(prim_path)).name == "root_joint":
+    # fix_base=True makes the importer return the fixed world->base JOINT
+    # prim as "articulation root", not the actual body/Xform. Pointing
+    # SingleArticulation at a joint (rather than the Xform carrying
+    # PhysicsArticulationRootAPI) leaves get_generalized_gravity_forces()
+    # returning near-zero noise even though DOFs/max-efforts still resolve.
+    prim_path = str(Path(str(prim_path)).parent)
 print(f"Using articulation root: {prim_path}")
 
 robot = world.scene.add(SingleArticulation(prim_path=str(prim_path), name="openarm"))
