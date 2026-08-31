@@ -20,6 +20,16 @@
 - README images: Isaac premiere, impedance plots, Drake plot
 - SAC / force-collect / ACT short train demos earlier
 - `docs/STATUS.md`, `docs/motor_sizing_report.md`, `docs/drake_dynamics_report.json`
+- **OpenArm custom motor kits** (MuJoCo): cloned `~/openarm_mujoco` + `~/openarm_description`;
+  `analyze_openarm_motors.py` compares Damiao / flat-10 / weak / strong packs →
+  `docs/openarm_motor_comparison.{md,png,json}`
+- **OpenArm Isaac check** (PhysX): `analyze_openarm_isaac.py` imports
+  `assets/openarm_v1_isaac.urdf`, effort-mode PD+g on left arm →
+  `docs/openarm_isaac_motor_comparison.{md,png,json}`
+- **OpenArm fixes**: soft motion + per-joint PD in `openarm_motor_common.py`;
+  MuJoCo now sizes via **inverse-dynamics peak τ** (Damiao fits with ≥6.5× headroom
+  on soft sine; weak hobby fails J2). Closed-loop sat was PD windup — not true motor need.
+  Isaac gravity still ~0 after USD/view enable (known gap).
 
 ## What’s left
 1. Fix Isaac contact force readout (pad collision filter / contact API)
@@ -27,9 +37,13 @@
 3. ROS 2 / URDF bridge (optional)
 4. Cartesian / OSC impedance (optional)
 5. Premiere MP4 export
+6. Optional: Isaac Lab OpenArm bringup (beyond MuJoCo motor kits)
+7. OpenArm Isaac gravity still near-zero after enable — dig into body flags
 
 ## Commands
 ```bash
 .venv/bin/python -u analyze_dynamics_drake.py
 OMNI_KIT_ACCEPT_EULA=YES .venv/bin/python -u analyze_impedance_full_pack.py --headless
+.venv/bin/python -u analyze_openarm_motors.py   # custom Damiao motor kits, no GPU
+OMNI_KIT_ACCEPT_EULA=YES .venv/bin/python -u analyze_openarm_isaac.py --headless
 ```

@@ -41,6 +41,40 @@ Effort-mode joint impedance on the UR10, with stiff/soft gain comparison and a f
 OMNI_KIT_ACCEPT_EULA=YES .venv/bin/python -u analyze_impedance_motors.py --headless
 OMNI_KIT_ACCEPT_EULA=YES .venv/bin/python -u analyze_impedance_full_pack.py --headless
 .venv/bin/python -u analyze_dynamics_drake.py   # no Isaac / GPU needed
+.venv/bin/python -u analyze_openarm_motors.py   # OpenArm Damiao motor kits (MuJoCo)
+```
+
+### OpenArm — different motors (custom)
+
+[Enactic OpenArm](https://github.com/enactic/openarm) uses modular **Damiao** BLDC actuators (±7–40 N·m) instead of UR industrial servos. Clones live under `~/openarm_mujoco` and `~/openarm_description`. MuJoCo compares Damiao / flat-10 / weak / strong torque packs:
+
+![OpenArm motor kit comparison](docs/openarm_motor_comparison.png)
+
+*Custom motor kits on OpenArm v1 — peak τ vs limit, saturation, tracking (`analyze_openarm_motors.py`). Full write-up: `docs/openarm_motor_comparison.md`.*
+
+Isaac PhysX check (same kits, URDF import):
+
+![OpenArm Isaac motor kit comparison](docs/openarm_isaac_motor_comparison.png)
+
+*Isaac Sim effort-mode left-arm kits (`analyze_openarm_isaac.py`) — see `docs/openarm_isaac_motor_comparison.md`.*
+
+Live view (`view_openarm_live.py`):
+
+![OpenArm live MuJoCo view](docs/openarm_live_mujoco.png)
+
+*MuJoCo OpenArm during Damiao v2 live run.*
+
+![OpenArm live motor graphs](docs/openarm_live_graphs.png)
+
+*Live graphs — tracking, |τ| vs limits, error, rolling saturation (wrist J5–J7 at 100%).*
+
+```bash
+.venv/bin/python -u analyze_openarm_motors.py
+OMNI_KIT_ACCEPT_EULA=YES .venv/bin/python -u analyze_openarm_isaac.py --headless
+.venv/bin/python -u view_openarm_live.py
+.venv/bin/python -u view_openarm_live.py --spring soft --kit damiao_v2
+.venv/bin/python -u view_openarm_live.py --config configs/openarm_motor.yaml
+# live keys: [/]=spring  -/==damping  1-4=presets  Tab=kit
 ```
 
 ---

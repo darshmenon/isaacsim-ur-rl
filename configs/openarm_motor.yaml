@@ -1,0 +1,20 @@
+# OpenArm virtual motor spring / damper + kit defaults
+# Used by view_openarm_live.py and analyze_openarm_motors.py (--config)
+
+spring:
+  # soft | medium | stiff | very_stiff  (scales default per-joint Kp)
+  preset: medium
+  # extra multiplier on spring (1.0 = as preset)
+  scale: 1.0
+  # damping ratio ζ for Kd = 2 ζ √Kp  (1.0 ≈ critical)
+  damp_ratio: 1.0
+  # optional full overrides (length 7). null = use preset+scale
+  # kp: [25, 25, 18, 18, 10, 10, 10]
+  # kd: null
+
+motor_kit: damiao_v2   # damiao_v2 | equal_10nm | weak_hobby | strong_up
+
+motion:
+  # leave null to use openarm_motor_common defaults
+  amp_scale: 1.0
+  freq_scale: 1.0
