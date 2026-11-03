@@ -111,6 +111,23 @@ if hasattr(robot, "enable_gravity"):
 for _ in range(20):
     world.step(render=False)
 
+# The UR10's raw all-joints-near-zero USD default pose is a near-singular,
+# near-self-collision configuration (EE ends up ~5cm off the ground). With
+# gravity now on, driving out of it via open-loop effort-mode PD (Kp/Kd
+# computed in Python, zero PD at the physics level) deadlocks the solver --
+# verified empirically: joints commanded hundreds of N·m produced *zero*
+# net motion (mean mechanical power ~0W, 100% saturation) for the entire
+# controller-comparison and gain-sweep sections below in earlier runs, i.e.
+# every earlier "trusted" number from this script was measured on a frozen
+# robot, not a tracking one. Teleporting to a safe home pose first (still in
+# position-drive mode, before switching to effort) sidesteps the deadlock
+# entirely.
+robot.set_joint_positions(
+    np.array([0.0, -1.0, 1.2, -1.4, -1.57, 0.0], dtype=np.float32)
+)
+for _ in range(20):
+    world.step(render=False)
+
 ctrl = robot.get_articulation_controller()
 ctrl.switch_control_mode("effort")
 idx = np.arange(6)
@@ -241,7 +258,18 @@ print("\n=== Contact compliance probe (vs pad) ===")
 q_reach = np.array([0.0, -1.2, 1.6, -1.9, -1.57, 0.0], dtype=np.float64)
 for _ in range(100):
     apply_tau(120.0 * (q_reach - get_q()) + 28.0 * (0.0 - get_qd()) + get_gravity())
-print(f"  EE above pad at z={get_ee()[2]:.3f}m")
+ee_settle = get_ee()
+print(f"  EE above pad at z={ee_settle[2]:.3f}m")
+
+# The pad was placed at a nominal (0.55, 0, 0.20) when the scene was built,
+# but q_reach's actual forward kinematics lands the wrist elsewhere (found
+# empirically: x~0.84, not 0.55) -- the press loop below was pressing the
+# wrist through empty space, past the pad's footprint, so contact never
+# registered. Recenter the pad under wherever the wrist actually settled
+# instead of relying on q_reach's FK matching the pad's hardcoded position.
+pad.set_world_pose(position=np.array([ee_settle[0], ee_settle[1], 0.20]))
+for _ in range(5):
+    world.step(render=False)
 
 wrist = RigidContactView(
     prim_paths_expr="/World/UR10/wrist_3_link",
@@ -255,21 +283,30 @@ for name, kp_c in [("soft", 35.0), ("stiff", 120.0)]:
         apply_tau(120.0 * (q_reach - get_q()) + 28.0 * (0.0 - get_qd()) + get_gravity())
     wrist.initialize()
     zs, fs = [], []
-    for k in range(100):
+    for k in range(220):
         q_cmd = q_reach.copy()
-        q_cmd[1] = q_reach[1] - 0.01 * k  # press into pad
-        apply_tau(kp_c * (q_cmd - get_q()) + 20.0 * (0.0 - get_qd()) + get_gravity())
+        # NOTE: "-" here previously moved the wrist *up and away* from the
+        # pad in this arm configuration (verified empirically) -- "+" is the
+        # direction that actually presses down into the pad.
+        q_cmd[1] = q_reach[1] + 0.01 * k  # press into pad
+        for _ in range(3):
+            apply_tau(kp_c * (q_cmd - get_q()) + 20.0 * (0.0 - get_qd()) + get_gravity())
         ee = get_ee()
         force = np.asarray(wrist.get_net_contact_forces(), dtype=np.float64).reshape(-1)[:3]
         zs.append(float(ee[2]))
         fs.append(float(np.linalg.norm(force)))
     zs, fs = np.array(zs), np.array(fs)
     print(f"  {name:5s} min_z={zs.min():.3f}m  peak|F|={fs.max():.1f}N")
-    hit = np.where(fs > 5.0)[0]
+    # Contact forces here are small (sub-N to a few N, wrist-vs-pad -- not
+    # the multi-kN scale of the earlier unclipped-torque bugs), so use a
+    # threshold that actually sits below the observed peaks instead of the
+    # old 5.0 N cutoff, which silently discarded every real contact sample.
+    hit_thresh = max(0.05, 0.1 * fs.max())
+    hit = np.where(fs > hit_thresh)[0]
     if len(hit) > 5:
         z0 = zs[hit[0]]
         defl = np.maximum(z0 - zs, 0.0)
-        mask = fs > 5.0
+        mask = fs > hit_thresh
         k_est = float(np.linalg.lstsq(defl[mask].reshape(-1, 1), fs[mask], rcond=None)[0][0])
     else:
         defl = np.zeros_like(zs)

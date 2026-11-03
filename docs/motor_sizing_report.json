@@ -7,132 +7,132 @@
     56.0,
     56.0
   ],
-  "recommended_kp": 80.0,
-  "recommended_kd": 17.88854381999832,
+  "recommended_kp": 40.0,
+  "recommended_kd": 12.649110640673518,
   "joints": {
     "J1": {
-      "peak_tau_Nm": 12.727121423271239,
-      "rms_tau_Nm": 8.99340309398231,
-      "energy_J": 0.0015354187774768663,
-      "rms_tracking_rad": 0.10606592634931651,
+      "peak_tau_Nm": 4.426459045980952,
+      "rms_tau_Nm": 2.967487790320499,
+      "energy_J": 0.8285145056784455,
+      "rms_tracking_rad": 0.05702699969042683,
       "limit_Nm": 330.0,
-      "suggest_cont_Nm": 13.490104640973467,
-      "suggest_peak_Nm": 15.272545707925486
+      "suggest_cont_Nm": 4.4512316854807485,
+      "suggest_peak_Nm": 5.311750855177142
     },
     "J2": {
-      "peak_tau_Nm": 210.77386560203155,
-      "rms_tau_Nm": 201.0459730335167,
-      "energy_J": 0.1329736062313898,
-      "rms_tracking_rad": 1.0146372899968146,
+      "peak_tau_Nm": 97.1175344503249,
+      "rms_tau_Nm": 88.31090185299949,
+      "energy_J": 37.93937588767428,
+      "rms_tracking_rad": 0.09468923041959969,
       "limit_Nm": 330.0,
-      "suggest_cont_Nm": 301.56895955027505,
-      "suggest_peak_Nm": 252.92863872243785
+      "suggest_cont_Nm": 132.46635277949923,
+      "suggest_peak_Nm": 116.54104134038987
     },
     "J3": {
-      "peak_tau_Nm": 81.41943746381368,
-      "rms_tau_Nm": 72.1851804643312,
-      "energy_J": 0.09557022504313249,
-      "rms_tracking_rad": 1.3160055169646627,
+      "peak_tau_Nm": 40.05318329170163,
+      "rms_tau_Nm": 34.31859465400142,
+      "energy_J": 26.245060066384504,
+      "rms_tracking_rad": 0.04638735583781154,
       "limit_Nm": 150.0,
-      "suggest_cont_Nm": 108.27777069649679,
-      "suggest_peak_Nm": 97.70332495657641
+      "suggest_cont_Nm": 51.47789198100213,
+      "suggest_peak_Nm": 48.06381995004195
     },
     "J4": {
       "peak_tau_Nm": 56.0,
-      "rms_tau_Nm": 56.0,
-      "energy_J": 0.21255912298569457,
-      "rms_tracking_rad": 1.5269358183907955,
+      "rms_tau_Nm": 42.459270462880056,
+      "energy_J": 243.2681201506192,
+      "rms_tracking_rad": 0.447008243754073,
       "limit_Nm": 56.0,
       "suggest_cont_Nm": 56.0,
       "suggest_peak_Nm": 56.0
     },
     "J5": {
-      "peak_tau_Nm": 56.0,
-      "rms_tau_Nm": 51.42919086001764,
-      "energy_J": 0.10126319605264764,
-      "rms_tracking_rad": 0.6492489949739652,
+      "peak_tau_Nm": 54.023811101168675,
+      "rms_tau_Nm": 42.30427538089199,
+      "energy_J": 251.14086660213783,
+      "rms_tracking_rad": 0.3188561649116823,
       "limit_Nm": 56.0,
       "suggest_cont_Nm": 56.0,
       "suggest_peak_Nm": 56.0
     },
     "J6": {
-      "peak_tau_Nm": 43.099815380778566,
-      "rms_tau_Nm": 32.519837918484285,
-      "energy_J": 0.7887291047535954,
-      "rms_tracking_rad": 0.40552835202522025,
+      "peak_tau_Nm": 56.0,
+      "rms_tau_Nm": 41.9398008519668,
+      "energy_J": 236.14436402513286,
+      "rms_tracking_rad": 0.5218474701059281,
       "limit_Nm": 56.0,
-      "suggest_cont_Nm": 48.77975687772643,
-      "suggest_peak_Nm": 51.71977845693428
+      "suggest_cont_Nm": 56.0,
+      "suggest_peak_Nm": 56.0
     }
   },
   "controller_comparison": {
     "baseline": {
-      "mean_rms_rad": 0.9540254968936023,
-      "peak_tau_Nm": 113.85840160562671,
-      "mean_abs_power_W": 1.8371409942482906,
-      "saturation_frac": 1.0
+      "mean_rms_rad": 0.2479395404291155,
+      "peak_tau_Nm": 56.0,
+      "mean_abs_power_W": 25.867537469986946,
+      "saturation_frac": 0.7
     },
     "ff": {
-      "mean_rms_rad": 0.9476132417470452,
-      "peak_tau_Nm": 114.57185435218781,
-      "mean_abs_power_W": 0.051798862625903365,
-      "saturation_frac": 1.0
+      "mean_rms_rad": 0.42713190782806176,
+      "peak_tau_Nm": 56.0,
+      "mean_abs_power_W": 23.03025990468403,
+      "saturation_frac": 0.94
     },
     "ff_g": {
-      "mean_rms_rad": 0.9449261573638806,
-      "peak_tau_Nm": 210.70229259395472,
-      "mean_abs_power_W": 0.5043197870029544,
-      "saturation_frac": 1.0
+      "mean_rms_rad": 0.2377576879214153,
+      "peak_tau_Nm": 101.24910839843362,
+      "mean_abs_power_W": 67.37779174311923,
+      "saturation_frac": 0.96
     }
   },
   "gain_sweep": {
     "40.0": {
-      "mean_rms_rad": 0.8642979133451784,
-      "peak_tau_Nm": 166.06393402097677,
-      "mean_abs_power_W": 3.3414563950279934,
-      "saturation_frac": 0.69
+      "mean_rms_rad": 0.2476359107865869,
+      "peak_tau_Nm": 97.1175344503249,
+      "mean_abs_power_W": 66.29719176980227,
+      "saturation_frac": 0.89
     },
     "60.0": {
-      "mean_rms_rad": 0.845092454263335,
-      "peak_tau_Nm": 188.32893218061207,
-      "mean_abs_power_W": 0.2982279173903801,
+      "mean_rms_rad": 0.30394038123149403,
+      "peak_tau_Nm": 96.78895745484202,
+      "mean_abs_power_W": 59.006964900125205,
       "saturation_frac": 1.0
     },
     "80.0": {
-      "mean_rms_rad": 0.8364036497834624,
-      "peak_tau_Nm": 210.77386560203155,
-      "mean_abs_power_W": 0.05552627807683069,
+      "mean_rms_rad": 0.32145451281155846,
+      "peak_tau_Nm": 95.8661749449905,
+      "mean_abs_power_W": 58.04609334932655,
       "saturation_frac": 1.0
     },
     "120.0": {
-      "mean_rms_rad": 0.8364227483008667,
-      "peak_tau_Nm": 255.63922765279946,
-      "mean_abs_power_W": 0.03778826259570359,
+      "mean_rms_rad": 0.3562720907935526,
+      "peak_tau_Nm": 95.20625015735077,
+      "mean_abs_power_W": 65.4444014653641,
       "saturation_frac": 1.0
     },
     "160.0": {
-      "mean_rms_rad": 0.8364227468120952,
-      "peak_tau_Nm": 300.4863027664969,
-      "mean_abs_power_W": 0.03837154201852209,
+      "mean_rms_rad": 0.3035650166399724,
+      "peak_tau_Nm": 97.081387855016,
+      "mean_abs_power_W": 69.64070469863582,
       "saturation_frac": 1.0
     }
   },
   "compliance_k_est_N_per_m": {
     "soft": NaN,
-    "stiff": NaN
+    "stiff": 103.08544772618099
   },
   "ik_errors_m": [
-    0.0017276320685821395,
-    0.002400978316587712,
-    0.0009488887727653662
+    0.0019184554578343482,
+    0.0024451145253416577,
+    0.0027603806621263804
   ],
   "gravity_sample_Nm": [
-    -3.7780337152071297e-06,
-    -11.331899642944336,
-    -35.439517974853516,
-    -1.6736277341842651,
-    -0.00802048109471798,
-    2.4776392049119522e-09
+    -3.7680122204619693e-06,
+    -13.732569694519043,
+    -35.11202621459961,
+    -1.368994951248169,
+    0.008763387799263,
+    2.851298974704264e-09
   ],
   "notes": "Torques are clipped to PhysX max_efforts. Prefer runs with low saturation_frac."
 }
